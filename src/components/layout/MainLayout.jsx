@@ -18,7 +18,8 @@ import {
   ArrowRightToLine,
 } from 'lucide-react';
 import ThemeConstants from '../../constants/ThemeConstants';
-import logo from '../../../public/logoCr.png'; // Importa tu logo aquí
+// Importaremos el logo condicionalmente para evitar errores
+const logoPath = '/logoCr.png';
 
 const LAYOUT_TYPE_KEY = 'canagrosa-layout-type';
 
@@ -142,7 +143,7 @@ const MainLayout = ({ children }) => {
         <header className={`${ThemeConstants.bgColors.header} ${ThemeConstants.shadows.sm} sticky top-0 z-40`}>
           <div className="flex justify-between items-center px-6 py-3">
             <div className="flex items-center">
-            <img src={logo} alt="CANAGROSA Logo" className="h-8 mr-6" />
+              <img src={logoPath} alt="CANAGROSA Logo" className="h-8 mr-6" />
               
               <nav className="hidden md:block">
                 <ul className="flex space-x-2">
@@ -262,7 +263,7 @@ const MainLayout = ({ children }) => {
       >
         <div className="flex items-center justify-between p-4 border-b border-slate-700">
           <div className={`${sidebarOpen ? 'block' : 'hidden'}`}>
-            <img src={logo} alt="CANAGROSA Logo" className="h-8" />
+            <img src={logoPath} alt="CANAGROSA Logo" className="h-8" />
           </div>
           <div className="flex items-center">
             <button 

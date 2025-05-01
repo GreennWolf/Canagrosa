@@ -1,28 +1,27 @@
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import React, { useState, useCallback, useRef, useEffect, forwardRef } from 'react';
 import { 
   SlidersHorizontal,
   Eye,
   EyeOff,
   GripHorizontal,
   Check,
-  Loader
+  Loader,
+  ChevronDown,
+  ArrowLeft,
+  Plus,
+  Minus
 } from 'lucide-react';
 import ThemeConstants from '../../constants/ThemeConstants';
 
-// Componente Tooltip personalizado
+// Tooltip simplificado para contenido truncado
 const Tooltip = ({ content, children }) => {
   const [showTooltip, setShowTooltip] = useState(false);
   const [position, setPosition] = useState({ x: 0, y: 0 });
-  const tooltipRef = useRef(null);
   const childRef = useRef(null);
 
-  // Mostrar tooltip
   const handleMouseEnter = (e) => {
     if (!childRef.current) return;
-    
-    // Verificar si el contenido está truncado
     const isTruncated = childRef.current.scrollWidth > childRef.current.clientWidth;
-    
     if (isTruncated) {
       const rect = childRef.current.getBoundingClientRect();
       setPosition({
@@ -33,25 +32,19 @@ const Tooltip = ({ content, children }) => {
     }
   };
 
-  // Ocultar tooltip
-  const handleMouseLeave = () => {
-    setShowTooltip(false);
-  };
-
   return (
     <>
       <div 
         ref={childRef}
         className="truncate"
         onMouseEnter={handleMouseEnter}
-        onMouseLeave={handleMouseLeave}
+        onMouseLeave={() => setShowTooltip(false)}
       >
         {children}
       </div>
       
       {showTooltip && (
         <div
-          ref={tooltipRef}
           className="fixed z-50 bg-slate-800 text-white text-xs py-1 px-2 rounded shadow-lg max-w-xs"
           style={{
             left: position.x,
@@ -65,7 +58,7 @@ const Tooltip = ({ content, children }) => {
   );
 };
 
-// Menú de personalización de columnas mejorado
+// Menú de personalización de columnas
 const ColumnCustomizationMenu = ({ 
   columns,
   visibleColumns,
@@ -73,24 +66,26 @@ const ColumnCustomizationMenu = ({
   onClose,
   position,
   columnOrder,
-  setColumnOrder
+  setColumnOrder,
+  columnWidths,
+  setColumnWidths,
+  minColumnWidth = 60,
+  maxColumnWidth = 500
 }) => {
-  // Estado local para trabajar con las columnas mientras se editan
   const [columnSettings, setColumnSettings] = useState(
     columnOrder.map(accessorId => {
       const col = columns.find(c => c.accessor === accessorId);
       return {
         ...col,
-        visible: visibleColumns.includes(accessorId)
+        visible: visibleColumns.includes(accessorId),
+        width: columnWidths[accessorId] || 120
       };
     })
   );
   
-  // Estado para mantener la columna que se está arrastrando
   const [draggedColumn, setDraggedColumn] = useState(null);
   const [dragOverColumn, setDragOverColumn] = useState(null);
 
-  // Manejar el cambio de visibilidad de columnas
   const handleVisibilityChange = (accessor) => {
     setColumnSettings(prev => {
       const newSettings = prev.map(col => {
@@ -103,27 +98,10 @@ const ColumnCustomizationMenu = ({
     });
   };
 
-  // Guardar cambios y cerrar
-  const handleSave = () => {
-    // Extraer solo los accessors de las columnas visibles
-    const newVisibleColumns = columnSettings
-      .filter(col => col.visible)
-      .map(col => col.accessor);
-    
-    setVisibleColumns(newVisibleColumns);
-    
-    // Actualizar orden de columnas
-    setColumnOrder(columnSettings.map(col => col.accessor));
-    
-    onClose();
-  };
-
-  // Manejar inicio de arrastre
   const handleDragStart = (e, column) => {
     setDraggedColumn(column);
   };
 
-  // Manejar cuando el arrastre pasa sobre otra columna
   const handleDragOver = (e, column) => {
     e.preventDefault();
     if (draggedColumn && draggedColumn.accessor !== column.accessor) {
@@ -131,7 +109,6 @@ const ColumnCustomizationMenu = ({
     }
   };
 
-  // Manejar cuando se suelta el elemento arrastrado
   const handleDrop = (e) => {
     e.preventDefault();
     
@@ -141,7 +118,6 @@ const ColumnCustomizationMenu = ({
         const draggedIndex = newColumns.findIndex(col => col.accessor === draggedColumn.accessor);
         const dropIndex = newColumns.findIndex(col => col.accessor === dragOverColumn.accessor);
         
-        // Reordenar el array
         const [removed] = newColumns.splice(draggedIndex, 1);
         newColumns.splice(dropIndex, 0, removed);
         
@@ -153,46 +129,83 @@ const ColumnCustomizationMenu = ({
     setDragOverColumn(null);
   };
 
-  // Componente de checkbox personalizado y más grande
+  // Función para ajustar el ancho de una columna
+  const adjustColumnWidth = (accessor, amount) => {
+    setColumnSettings(prev => {
+      return prev.map(col => {
+        if (col.accessor === accessor) {
+          const newWidth = Math.max(
+            minColumnWidth, 
+            Math.min(col.width + amount, maxColumnWidth)
+          );
+          return { ...col, width: newWidth };
+        }
+        return col;
+      });
+    });
+  };
+
+  // Guardar cambios
+  const handleSave = () => {
+    const newVisibleColumns = columnSettings
+      .filter(col => col.visible)
+      .map(col => col.accessor);
+    
+    setVisibleColumns(newVisibleColumns);
+    setColumnOrder(columnSettings.map(col => col.accessor));
+    
+    // Guardar los anchos de columnas
+    const newWidths = {};
+    columnSettings.forEach(col => {
+      newWidths[col.accessor] = col.width;
+    });
+    setColumnWidths(newWidths);
+    
+    onClose();
+  };
+
+  // Checkbox simplificado
   const CustomCheckbox = ({ checked, onChange, label }) => (
     <div 
       className="flex items-center cursor-pointer" 
       onClick={onChange}
     >
       <div className={`
-        w-5 h-5 flex items-center justify-center mr-2
+        w-4 h-4 flex items-center justify-center mr-2
         border rounded
         ${checked 
           ? 'bg-blue-600 border-blue-600' 
           : `bg-white ${ThemeConstants.borders.input}`}
       `}>
-        {checked && <Check size={12} color="white" />}
+        {checked && <Check size={10} color="white" />}
       </div>
-      <span className={ThemeConstants.textColors.primary}>{label}</span>
+      <span className="text-xs text-gray-700">{label}</span>
     </div>
   );
 
+  // Obtener el ancho de cada columna
+  const getColumnWidth = (accessor) => {
+    const column = columnSettings.find(col => col.accessor === accessor);
+    return column ? column.width : 120;
+  };
+
   return (
     <div 
-      className={`absolute z-50 ${ThemeConstants.bgColors.card} ${ThemeConstants.borders.default} ${ThemeConstants.shadows.lg} ${ThemeConstants.rounded.md} p-3 w-72`}
+      className="absolute z-50 bg-white border border-gray-200 shadow-lg rounded-md p-2 w-80"
       style={{ 
         top: position.y, 
         left: position.x 
       }}
-      onClick={e => e.stopPropagation()} // Prevenir cierre al hacer clic dentro
+      onClick={e => e.stopPropagation()}
     >
-      <div className="flex justify-between items-center mb-3 pb-2 border-b border-slate-200">
-        <h3 className={`${ThemeConstants.text.sm} font-medium ${ThemeConstants.textColors.primary}`}>Personalizar columnas</h3>
-        <div className={`${ThemeConstants.text.xs} ${ThemeConstants.textColors.secondary}`}>
-          {columnSettings.filter(c => c.visible).length} de {columns.length} visible(s)
+      <div className="flex justify-between items-center mb-2 pb-1 border-b border-gray-200">
+        <h3 className="text-xs font-medium text-gray-700">Personalizar columnas</h3>
+        <div className="text-xs text-gray-500">
+          {columnSettings.filter(c => c.visible).length} de {columns.length}
         </div>
       </div>
       
-      <p className={`${ThemeConstants.text.xs} ${ThemeConstants.textColors.secondary} mb-3`}>
-        Arrastra para reordenar o marca/desmarca para mostrar/ocultar
-      </p>
-      
-      <div className="max-h-60 overflow-y-auto mb-4">
+      <div className="max-h-96 overflow-y-auto mb-3">
         <ul className="space-y-2">
           {columnSettings.map((column) => (
             <li 
@@ -202,43 +215,71 @@ const ColumnCustomizationMenu = ({
               onDragOver={(e) => handleDragOver(e, column)}
               onDrop={handleDrop}
               className={`
-                flex items-center p-2 ${ThemeConstants.text.sm} ${ThemeConstants.rounded.md}
-                ${dragOverColumn?.accessor === column.accessor ? 'bg-blue-50' : ''}
+                flex flex-col p-2 text-xs rounded border border-gray-200
+                ${dragOverColumn?.accessor === column.accessor ? 'bg-blue-50 border-blue-200' : ''}
                 ${draggedColumn?.accessor === column.accessor ? 'opacity-50' : ''}
-                cursor-move hover:bg-slate-100
+                cursor-move hover:bg-gray-50
               `}
             >
-              <div className="flex items-center flex-grow">
-                <div className={`mr-2 ${ThemeConstants.textColors.light}`}>
-                  <GripHorizontal size={16} />
+              {/* Primera fila: nombre y visibilidad */}
+              <div className="flex items-center justify-between w-full mb-2">
+                <div className="flex items-center flex-grow">
+                  <div className="mr-1 text-gray-400">
+                    <GripHorizontal size={12} />
+                  </div>
+                  
+                  <CustomCheckbox 
+                    checked={column.visible}
+                    onChange={() => handleVisibilityChange(column.accessor)}
+                    label={column.header}
+                  />
                 </div>
-                
-                <CustomCheckbox 
-                  checked={column.visible}
-                  onChange={() => handleVisibilityChange(column.accessor)}
-                  label={column.header}
-                />
+                <div className="text-gray-400">
+                  {column.visible 
+                    ? <Eye size={14} className="text-blue-600" /> 
+                    : <EyeOff size={14} />}
+                </div>
               </div>
-              <div className={ThemeConstants.textColors.light}>
-                {column.visible 
-                  ? <Eye size={16} className="text-blue-600" /> 
-                  : <EyeOff size={16} />}
+              
+              {/* Segunda fila: ajuste de ancho */}
+              <div className="flex items-center w-full mt-1">
+                <div className="flex-grow border-t border-gray-200 mr-2"></div>
+                <div className="flex items-center bg-gray-100 rounded p-1">
+                  <button 
+                    onClick={() => adjustColumnWidth(column.accessor, -10)}
+                    className="p-1 text-gray-600 hover:text-blue-600 focus:outline-none"
+                  >
+                    <Minus size={12} />
+                  </button>
+                  
+                  <div className="flex items-center mx-1">
+                    <ArrowLeft size={10} className="text-gray-400 mr-1" />
+                    <span className="text-xs text-gray-700 w-8 text-center">{getColumnWidth(column.accessor)}px</span>
+                  </div>
+                  
+                  <button 
+                    onClick={() => adjustColumnWidth(column.accessor, 10)}
+                    className="p-1 text-gray-600 hover:text-blue-600 focus:outline-none"
+                  >
+                    <Plus size={12} />
+                  </button>
+                </div>
               </div>
             </li>
           ))}
         </ul>
       </div>
       
-      <div className="flex justify-end space-x-2 pt-2 border-t border-slate-200">
+      <div className="flex justify-end space-x-2 pt-1 border-t border-gray-200">
         <button
           onClick={onClose}
-          className={`px-3 py-1.5 ${ThemeConstants.text.sm} ${ThemeConstants.buttons.secondary} ${ThemeConstants.rounded.md}`}
+          className="px-2 py-1 text-xs border border-gray-300 rounded text-gray-700 hover:bg-gray-50"
         >
           Cancelar
         </button>
         <button
           onClick={handleSave}
-          className={`px-3 py-1.5 ${ThemeConstants.text.sm} ${ThemeConstants.buttons.primary} ${ThemeConstants.rounded.md}`}
+          className="px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700"
         >
           Aplicar
         </button>
@@ -247,18 +288,23 @@ const ColumnCustomizationMenu = ({
   );
 };
 
-const CustomizableTable = ({
+const CustomizableTable = forwardRef(({
   data,
   columns,
   isLoading,
+  isLoadingMore = false,
   onRowClick,
   onView,
   initialVisibleColumns = null,
   tableId = 'default-table',
   loadMoreData,
   hasMoreData = false,
-  selectable = true
-}) => {
+  selectable = true,
+  emptyMessage = "No hay datos disponibles",
+  infiniteScrollThreshold = 200, // Distancia en px desde el fondo para cargar más
+  minColumnWidth = 60, // Ancho mínimo para columnas en px
+  maxColumnWidth = 500, // Ancho máximo para columnas en px
+}, ref) => {
   // Estado para el orden de columnas
   const [columnOrder, setColumnOrder] = useState(
     () => {
@@ -267,7 +313,6 @@ const CustomizableTable = ({
       if (savedOrder) {
         try {
           const parsed = JSON.parse(savedOrder);
-          // Verificar que es un array válido
           if (Array.isArray(parsed) && parsed.length > 0) {
             return parsed;
           }
@@ -275,7 +320,6 @@ const CustomizableTable = ({
           console.error("Error parsing saved column order:", e);
         }
       }
-      // Si no hay orden guardado, usar el orden por defecto
       return columns.map(col => col.accessor);
     }
   );
@@ -283,12 +327,10 @@ const CustomizableTable = ({
   // Estado para columnas visibles
   const [visibleColumns, setVisibleColumns] = useState(
     () => {
-      // Intentar cargar desde localStorage
       const saved = localStorage.getItem(`table-columns-${tableId}`);
       if (saved) {
         try {
           const parsed = JSON.parse(saved);
-          // Verificar que es un array válido
           if (Array.isArray(parsed) && parsed.length > 0) {
             return parsed;
           }
@@ -296,7 +338,6 @@ const CustomizableTable = ({
           console.error("Error parsing saved columns:", e);
         }
       }
-      // Si no hay guardadas, usar todas las columnas o las proporcionadas
       return initialVisibleColumns || columns.map(col => col.accessor);
     }
   );
@@ -304,7 +345,6 @@ const CustomizableTable = ({
   // Estado para anchos personalizados de columnas
   const [columnWidths, setColumnWidths] = useState(
     () => {
-      // Intentar cargar desde localStorage
       const savedWidths = localStorage.getItem(`table-column-widths-${tableId}`);
       if (savedWidths) {
         try {
@@ -318,44 +358,28 @@ const CustomizableTable = ({
     }
   );
   
-  // Estado para la fila seleccionada
+  // Estados para funcionalidad
   const [selectedRow, setSelectedRow] = useState(null);
-  
-  // Estado para el loading de más datos
-  const [isLoadingMore, setIsLoadingMore] = useState(false);
-  
-  // Estado para el redimensionamiento de columnas
-  const [resizingColumn, setResizingColumn] = useState(null);
-  const [startX, setStartX] = useState(0);
-  const [startWidth, setStartWidth] = useState(0);
-  
-  // Referencia para el elemento observado (para infinite scroll)
-  const loadMoreRef = useRef(null);
-  
-  // Referencia para el contenedor de la tabla
   const tableContainerRef = useRef(null);
-  
-  // Estado para medir el ancho disponible
+  const tableRef = useRef(null);
   const [tableWidth, setTableWidth] = useState(0);
+  const [columnMenuOpen, setColumnMenuOpen] = useState(false);
+  const [columnMenuPosition, setColumnMenuPosition] = useState({ x: 0, y: 0 });
+  const [draggedHeader, setDraggedHeader] = useState(null);
+  const [dragOverHeader, setDragOverHeader] = useState(null);
+  const [isInfiniteLoading, setIsInfiniteLoading] = useState(false);
   
-  // Calcular ancho disponible cuando el componente se monta
-  useEffect(() => {
-    if (tableContainerRef.current) {
-      const resizeObserver = new ResizeObserver(entries => {
-        if (entries[0]) {
-          setTableWidth(entries[0].contentRect.width);
-        }
-      });
-      
-      resizeObserver.observe(tableContainerRef.current);
-      
-      return () => {
-        resizeObserver.disconnect();
-      };
+  // Exponer la referencia del contenedor
+  React.useImperativeHandle(ref, () => ({
+    tableContainer: tableContainerRef.current,
+    scrollToTop: () => {
+      if (tableContainerRef.current) {
+        tableContainerRef.current.scrollTop = 0;
+      }
     }
-  }, []);
+  }));
   
-  // Guardar preferencias en localStorage cuando cambian
+  // Guardar preferencias en localStorage
   useEffect(() => {
     localStorage.setItem(`table-columns-${tableId}`, JSON.stringify(visibleColumns));
   }, [visibleColumns, tableId]);
@@ -368,48 +392,69 @@ const CustomizableTable = ({
     localStorage.setItem(`table-column-widths-${tableId}`, JSON.stringify(columnWidths));
   }, [columnWidths, tableId]);
   
-  // Estado para controlador el menú contextual de personalización
-  const [columnMenuOpen, setColumnMenuOpen] = useState(false);
-  const [columnMenuPosition, setColumnMenuPosition] = useState({ x: 0, y: 0 });
-  
-  // Estados para drag and drop de encabezados
-  const [draggedHeader, setDraggedHeader] = useState(null);
-  const [dragOverHeader, setDragOverHeader] = useState(null);
-  
-  // Configurar Intersection Observer para infinite scroll
+  // Calcular ancho disponible
   useEffect(() => {
-    if (!loadMoreData || !hasMoreData) return;
-    
-    const handleObserver = (entries) => {
-      const [entry] = entries;
-      if (entry.isIntersecting && !isLoadingMore) {
-        setIsLoadingMore(true);
-        loadMoreData().finally(() => {
-          setIsLoadingMore(false);
-        });
-      }
-    };
-    
-    const option = {
-      root: null,
-      rootMargin: '20px',
-      threshold: 0.1
-    };
-    
-    const observer = new IntersectionObserver(handleObserver, option);
-    
-    if (loadMoreRef.current) {
-      observer.observe(loadMoreRef.current);
+    if (tableContainerRef.current) {
+      const resizeObserver = new ResizeObserver(entries => {
+        if (entries[0]) {
+          setTableWidth(entries[0].contentRect.width);
+        }
+      });
+      
+      resizeObserver.observe(tableContainerRef.current);
+      return () => {
+        resizeObserver.disconnect();
+      };
     }
+  }, []);
+  
+  // Implementación del scroll infinito
+  useEffect(() => {
+    if (!loadMoreData || !hasMoreData || isLoading) return;
+    
+    const container = tableContainerRef.current;
+    if (!container) return;
+    
+    // Throttle para evitar muchas llamadas durante el scroll
+    let throttleTimer;
+    
+    const handleScroll = () => {
+      if (throttleTimer) return;
+      
+      throttleTimer = setTimeout(() => {
+        throttleTimer = null;
+        
+        if (isInfiniteLoading || !hasMoreData) return;
+        
+        const scrollHeight = container.scrollHeight;
+        const scrollTop = container.scrollTop;
+        const clientHeight = container.clientHeight;
+        
+        // Cargar más datos cuando el usuario se acerca al final
+        if (scrollHeight - scrollTop - clientHeight < infiniteScrollThreshold) {
+          const loadMore = async () => {
+            setIsInfiniteLoading(true);
+            try {
+              await loadMoreData();
+            } finally {
+              setTimeout(() => setIsInfiniteLoading(false), 300);
+            }
+          };
+          
+          loadMore();
+        }
+      }, 150); // Throttle de 150ms
+    };
+    
+    container.addEventListener('scroll', handleScroll);
     
     return () => {
-      if (loadMoreRef.current) {
-        observer.unobserve(loadMoreRef.current);
-      }
+      container.removeEventListener('scroll', handleScroll);
+      clearTimeout(throttleTimer);
     };
-  }, [loadMoreData, hasMoreData, isLoadingMore]);
+  }, [loadMoreData, hasMoreData, isInfiniteLoading, infiniteScrollThreshold, isLoading]);
   
-  // Manejador de clic derecho en encabezado
+  // Handlers para personalización de columnas
   const handleHeaderRightClick = (e) => {
     e.preventDefault();
     setColumnMenuPosition({ 
@@ -419,12 +464,20 @@ const CustomizableTable = ({
     setColumnMenuOpen(true);
   };
   
-  // Cerrar menú personalización
+  const handleColumnSettingsClick = (e) => {
+    e.stopPropagation();
+    const rect = e.currentTarget.getBoundingClientRect();
+    setColumnMenuPosition({ 
+      x: Math.min(rect.x - 200, window.innerWidth - 300),
+      y: Math.min(rect.y - 300, window.innerHeight - 500)
+    });
+    setColumnMenuOpen(true);
+  };
+  
   const closeColumnMenu = () => {
     setColumnMenuOpen(false);
   };
   
-  // Manejar clic fuera del menú para cerrarlo
   useEffect(() => {
     const handleClickOutside = (e) => {
       if (columnMenuOpen) {
@@ -438,7 +491,7 @@ const CustomizableTable = ({
     };
   }, [columnMenuOpen]);
   
-  // Manejar selección de fila
+  // Handlers para selección y navegación
   const handleRowClick = (row) => {
     if (selectable) {
       setSelectedRow(row);
@@ -446,8 +499,7 @@ const CustomizableTable = ({
     }
   };
   
-  // Manejar evento de teclas para navegación por teclado
-  const handleKeyDown = (e) => {
+  const handleKeyDown = useCallback((e) => {
     if (selectable && data.length > 0) {
       const currentIndex = selectedRow 
         ? data.findIndex(row => row === selectedRow)
@@ -465,9 +517,8 @@ const CustomizableTable = ({
         if (onRowClick) onRowClick(data[prevIndex]);
       }
     }
-  };
+  }, [data, selectedRow, onRowClick, selectable]);
   
-  // Establecer el tabIndex y los event listeners para navegación por teclado
   useEffect(() => {
     const tableElement = document.getElementById(`table-${tableId}`);
     if (tableElement) {
@@ -478,32 +529,28 @@ const CustomizableTable = ({
         tableElement.removeEventListener('keydown', handleKeyDown);
       };
     }
-  }, [tableId, handleKeyDown, data]);
+  }, [tableId, handleKeyDown]);
   
-  // Manejar inicio de arrastre para encabezados
+  // Handlers para drag and drop
   const handleHeaderDragStart = (e, accessor) => {
     setDraggedHeader(accessor);
-    // Cambiar la apariencia del elemento arrastrado
     if (e.dataTransfer) {
       e.dataTransfer.effectAllowed = "move";
       
-      // Crear una imagen personalizada para el arrastre (opcional)
       const dragImage = document.createElement('div');
       dragImage.textContent = columns.find(col => col.accessor === accessor)?.header || '';
       dragImage.style.position = 'absolute';
       dragImage.style.top = '-1000px';
-      dragImage.className = 'bg-blue-100 p-2 rounded border border-blue-300 text-blue-800';
+      dragImage.className = 'bg-blue-100 p-1 rounded border border-blue-300 text-blue-800 text-xs';
       document.body.appendChild(dragImage);
       e.dataTransfer.setDragImage(dragImage, 0, 0);
       
-      // Eliminar el elemento después
       setTimeout(() => {
         document.body.removeChild(dragImage);
       }, 0);
     }
   };
   
-  // Manejar cuando el arrastre pasa sobre otro encabezado
   const handleHeaderDragOver = (e, accessor) => {
     e.preventDefault();
     if (draggedHeader && draggedHeader !== accessor) {
@@ -511,12 +558,10 @@ const CustomizableTable = ({
     }
   };
   
-  // Manejar cuando se suelta el encabezado arrastrado
   const handleHeaderDrop = (e, accessor) => {
     e.preventDefault();
     
     if (draggedHeader && dragOverHeader && draggedHeader !== dragOverHeader) {
-      // Reordenar las columnas
       const newOrder = [...columnOrder];
       const draggedIndex = newOrder.indexOf(draggedHeader);
       const dropIndex = newOrder.indexOf(dragOverHeader);
@@ -532,80 +577,32 @@ const CustomizableTable = ({
     setDragOverHeader(null);
   };
   
-  // Manejar cuando termina el arrastre
   const handleHeaderDragEnd = () => {
     setDraggedHeader(null);
     setDragOverHeader(null);
   };
   
-  // Manejar inicio de redimensionamiento de columna
-  const handleResizeStart = (e, accessor) => {
-    e.preventDefault();
-    e.stopPropagation();
-    
-    setResizingColumn(accessor);
-    setStartX(e.clientX);
-    
-    // Obtener el ancho actual de la columna
-    const currentWidth = columnWidths[accessor] || 
-      document.querySelector(`th[data-column="${accessor}"]`).offsetWidth;
-    
-    setStartWidth(currentWidth);
-    
-    // Añadir event listeners para el movimiento y finalización del resize
-    document.addEventListener('mousemove', handleResizeMove);
-    document.addEventListener('mouseup', handleResizeEnd);
-  };
-  
-  // Manejar movimiento durante el redimensionamiento
-  const handleResizeMove = useCallback((e) => {
-    if (!resizingColumn) return;
-    
-    const differenceX = e.clientX - startX;
-    const newWidth = Math.max(80, startWidth + differenceX); // Mínimo 80px de ancho
-    
-    setColumnWidths(prev => ({
-      ...prev,
-      [resizingColumn]: newWidth
-    }));
-  }, [resizingColumn, startX, startWidth]);
-  
-  // Manejar fin de redimensionamiento
-  const handleResizeEnd = useCallback(() => {
-    setResizingColumn(null);
-    
-    // Quitar event listeners
-    document.removeEventListener('mousemove', handleResizeMove);
-    document.removeEventListener('mouseup', handleResizeEnd);
-  }, [handleResizeMove]);
-  
-  // Limpiar event listeners al desmontar
-  useEffect(() => {
-    return () => {
-      document.removeEventListener('mousemove', handleResizeMove);
-      document.removeEventListener('mouseup', handleResizeEnd);
-    };
-  }, [handleResizeMove, handleResizeEnd]);
-  
-  // Renderizar tabla
+  // Mostrar loader con feedback visual mejorado si está cargando y no hay datos
   if (isLoading && data.length === 0) {
     return (
-      <div className="flex justify-center items-center py-10">
-        <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-blue-600"></div>
+      <div className="flex flex-col justify-center items-center py-8 px-4 bg-white rounded-md shadow-sm border border-gray-200">
+        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-600 mb-3"></div>
+        <p className="text-gray-600 text-sm">Cargando datos...</p>
+        <p className="text-gray-500 text-xs mt-1">Esto puede tardar unos segundos</p>
       </div>
     );
   }
 
-  // Ordenar las columnas basadas en el estado columnOrder
+  // Ordenar columnas visibles
   const orderedVisibleColumns = columnOrder
     .filter(accessor => visibleColumns.includes(accessor))
     .map(accessor => columns.find(col => col.accessor === accessor))
-    .filter(Boolean); // Eliminar cualquier undefined
+    .filter(Boolean);
   
-  // Calcular anchos dinámicos para columnas
+  // Calcular anchos de columnas
   const calculateColumnWidths = () => {
     const totalWidth = tableWidth || tableContainerRef.current?.clientWidth || 1000;
-    const actionColumnWidth = onView ? 80 : 0;
+    const actionColumnWidth = onView ? 40 : 0;
     const availableWidth = totalWidth - actionColumnWidth;
     
     const columnsWithCustomWidth = orderedVisibleColumns.filter(col => columnWidths[col.accessor]);
@@ -616,13 +613,12 @@ const CustomizableTable = ({
     const columnsWithPresetWidth = orderedVisibleColumns.filter(col => 
       !columnWidths[col.accessor] && col.width);
     const presetWidth = columnsWithPresetWidth.reduce((sum, col) => {
-      // Extraer valor numérico de clases como 'w-16', 'w-32', etc.
       const match = col.width.match(/w-(\d+)/);
-      return sum + (match ? parseInt(match[1]) * 4 : 0); // Aproximación: multiplicar por 4px
+      return sum + (match ? parseInt(match[1]) * 4 : 0);
     }, 0);
     
     const remainingColumns = orderedVisibleColumns.length - columnsWithCustomWidth.length - columnsWithPresetWidth.length;
-    const flexColumnWidth = Math.max((availableWidth - fixedWidth - presetWidth) / (remainingColumns || 1), 120);
+    const flexColumnWidth = Math.max((availableWidth - fixedWidth - presetWidth) / (remainingColumns || 1), minColumnWidth);
     
     return {
       totalWidth,
@@ -633,36 +629,42 @@ const CustomizableTable = ({
   const { flexColumnWidth } = calculateColumnWidths();
 
   return (
-    <div className="flex flex-col h-full" ref={tableContainerRef}>
-      {/* Tabla responsive */}
-      <div className={`overflow-auto flex-grow ${ThemeConstants.borders.default} ${ThemeConstants.rounded.md}`}>
+    <div className="flex flex-col h-full" ref={ref}>
+      {/* Tabla con scroll infinito */}
+      <div 
+        className="overflow-auto flex-grow border border-gray-200 rounded-md bg-white" 
+        style={{ maxHeight: 'calc(100vh - 220px)', minHeight: '400px' }}
+        ref={tableContainerRef}
+      >
         <table 
-          className="w-full table-auto"
+          className="w-full table-auto text-xs"
           id={`table-${tableId}`}
+          ref={tableRef}
           style={{ tableLayout: 'fixed' }}
         >
-          <thead className={`${ThemeConstants.bgColors.tableHeader} sticky top-0 z-10`}>
+          <thead className="bg-gray-50 sticky top-0 z-10">
             <tr 
               onContextMenu={handleHeaderRightClick}
-              className={ThemeConstants.text.xs}
+              className="border-b border-gray-200"
             >
+              {/* Cabeceras de columna */}
               {orderedVisibleColumns.map((column) => (
                 <th
                   key={column.accessor}
                   data-column={column.accessor}
-                  className={`relative px-3 py-3 text-left ${ThemeConstants.text.xs} font-medium ${ThemeConstants.textColors.primary} uppercase tracking-wider border-b ${ThemeConstants.borders.table} cursor-grab hover:bg-slate-300 ${
-                    dragOverHeader === column.accessor ? 'bg-blue-100' : ''
+                  className={`relative px-2 py-1 text-left text-xs font-medium text-gray-700 uppercase tracking-wider border-b border-gray-200 cursor-grab hover:bg-gray-100 ${
+                    dragOverHeader === column.accessor ? 'bg-blue-50' : ''
                   } ${draggedHeader === column.accessor ? 'opacity-50' : ''}`}
                   style={{ 
                     width: columnWidths[column.accessor] ? 
                       `${columnWidths[column.accessor]}px` : 
                       column.width ? undefined : `${flexColumnWidth}px`,
-                    minWidth: '80px',
+                    minWidth: `${minColumnWidth}px`,
                     maxWidth: columnWidths[column.accessor] ? 
                       `${columnWidths[column.accessor]}px` : 
                       column.width ? undefined : `${flexColumnWidth * 1.5}px`,
                   }}
-                  title="Arrastra para reordenar o haz clic derecho para personalizar columnas"
+                  title={column.header}
                   draggable="true"
                   onDragStart={(e) => handleHeaderDragStart(e, column.accessor)}
                   onDragOver={(e) => handleHeaderDragOver(e, column.accessor)}
@@ -670,22 +672,14 @@ const CustomizableTable = ({
                   onDragEnd={handleHeaderDragEnd}
                 >
                   <div className="flex items-center">
-                    <GripHorizontal size={12} className="mr-1 text-slate-400 flex-shrink-0" />
+                    <GripHorizontal size={10} className="mr-1 text-gray-400 flex-shrink-0" />
                     <span className="truncate">{column.header}</span>
                   </div>
-                  
-                  {/* Manejador de redimensionamiento */}
-                  <div 
-                    className={`absolute top-0 right-0 h-full w-2 cursor-col-resize hover:bg-blue-300 ${
-                      resizingColumn === column.accessor ? 'bg-blue-400' : ''
-                    }`}
-                    onMouseDown={(e) => handleResizeStart(e, column.accessor)}
-                  />
                 </th>
               ))}
               {onView && (
-                <th className={`px-3 py-3 text-right ${ThemeConstants.text.xs} font-medium ${ThemeConstants.textColors.primary} uppercase tracking-wider border-b ${ThemeConstants.borders.table} w-20`}>
-                  Acciones
+                <th className="px-2 py-1 text-right text-xs font-medium text-gray-700 uppercase tracking-wider border-b border-gray-200 w-10">
+                  <span className="sr-only">Acciones</span>
                 </th>
               )}
             </tr>
@@ -697,22 +691,21 @@ const CustomizableTable = ({
                   key={rowIndex}
                   onClick={() => handleRowClick(row)}
                   className={`
-                    ${ThemeConstants.tableRowHover} cursor-pointer border-b ${ThemeConstants.borders.table}
-                    ${selectable && selectedRow === row ? ThemeConstants.tableRowSelected : ''}
-                    ${rowIndex % 2 === 0 ? ThemeConstants.bgColors.tableRow : ThemeConstants.bgColors.tableRowAlt}
+                    hover:bg-gray-50 cursor-pointer border-b border-gray-100
+                    ${selectable && selectedRow === row ? 'bg-blue-50' : ''}
+                    ${rowIndex % 2 === 0 ? 'bg-white' : 'bg-gray-50'}
                   `}
                 >
                   {orderedVisibleColumns.map((column) => (
                     <td 
                       key={`${rowIndex}-${column.accessor}`}
-                      className={`px-3 py-2 ${ThemeConstants.text.sm} ${ThemeConstants.textColors.primary}`}
+                      className="px-2 py-1 text-xs text-gray-900"
                       style={{
                         maxWidth: columnWidths[column.accessor] ? 
                           `${columnWidths[column.accessor]}px` : 
                           column.width ? undefined : `${flexColumnWidth * 1.5}px`,
                       }}
                     >
-                      {/* Renderizar con tooltip para contenido truncado */}
                       {column.render ? (
                         column.render(row)
                       ) : (
@@ -723,15 +716,13 @@ const CustomizableTable = ({
                     </td>
                   ))}
                   {onView && (
-                    <td className={`px-3 py-2 ${ThemeConstants.text.sm} ${ThemeConstants.textColors.primary} text-right`}>
-                      <div className="flex justify-end" onClick={(e) => e.stopPropagation()}>
-                        <button
-                          onClick={() => onView(row)}
-                          className={`p-1 ${ThemeConstants.textColors.link} ${ThemeConstants.linkHover}`}
-                        >
-                          <Eye size={18} />
-                        </button>
-                      </div>
+                    <td className="px-1 py-1 text-xs text-gray-900 text-right">
+                      <button
+                        onClick={(e) => { e.stopPropagation(); onView(row); }}
+                        className="p-1 text-blue-600 hover:text-blue-800"
+                      >
+                        <Eye size={14} />
+                      </button>
                     </td>
                   )}
                 </tr>
@@ -740,57 +731,50 @@ const CustomizableTable = ({
               <tr>
                 <td 
                   colSpan={orderedVisibleColumns.length + (onView ? 1 : 0)} 
-                  className={`px-4 py-2 text-center ${ThemeConstants.textColors.primary}`}
+                  className="px-2 py-6 text-center text-sm text-gray-500"
                 >
-                  No hay datos disponibles
+                  {emptyMessage}
                 </td>
               </tr>
             )}
           </tbody>
         </table>
         
-        {/* Elemento observado para infinite scroll */}
-        {hasMoreData && (
-          <div 
-            ref={loadMoreRef} 
-            className={`flex justify-center items-center py-4 ${ThemeConstants.textColors.light}`}
-          >
-            {isLoadingMore ? (
-              <div className="flex items-center">
-                <Loader size={16} className="animate-spin mr-2" />
-                <span>Cargando más datos...</span>
-              </div>
-            ) : (
-              <span className={ThemeConstants.text.sm}>Desplázate para cargar más</span>
-            )}
+        {/* Indicador de carga para el scroll infinito */}
+        {(isLoadingMore || isInfiniteLoading) && data.length > 0 && (
+          <div className="flex justify-center items-center py-3 bg-white">
+            <div className="flex items-center bg-blue-50 px-3 py-1 rounded-full shadow-sm animate-pulse text-xs">
+              <Loader size={12} className="animate-spin mr-2 text-blue-500" />
+              <span className="text-blue-600">Cargando más datos...</span>
+            </div>
+          </div>
+        )}
+        
+        {/* Mensaje cuando no hay más datos para cargar */}
+        {!hasMoreData && data.length > 0 && (
+          <div className="text-center py-2 text-xs text-gray-500 bg-gray-50 border-t border-gray-200">
+            Has llegado al final de los resultados
           </div>
         )}
       </div>
       
-      {/* Barra de estado inferior */}
-      <div className={`flex justify-between items-center px-4 py-3 ${ThemeConstants.bgColors.tableHeader} border-t ${ThemeConstants.borders.table}`}>
-        <div className={`${ThemeConstants.text.sm} ${ThemeConstants.textColors.primary}`}>
-          Mostrando {data.length} registros {hasMoreData ? '(desplázate para cargar más)' : ''}
+      {/* Barra de estado y customización */}
+      <div className="flex justify-between items-center px-3 py-1 bg-gray-50 border border-gray-200 border-t-0 rounded-b-md text-xs text-gray-500">
+        <div>
+          {data.length} registros {hasMoreData ? '(+)' : ''}
         </div>
         <button
-          onClick={(e) => {
-            e.stopPropagation();
-            const rect = e.currentTarget.getBoundingClientRect();
-            setColumnMenuPosition({ 
-              x: rect.x - 200, // Posicionar a la izquierda del botón
-              y: rect.y - 300  // Posicionar encima del botón
-            });
-            setColumnMenuOpen(true);
-          }}
-          className={`p-2 ${ThemeConstants.rounded.md} hover:bg-slate-300 flex items-center ${ThemeConstants.textColors.primary}`}
+          onClick={handleColumnSettingsClick}
+          className="p-1 rounded hover:bg-gray-200 flex items-center text-gray-600"
           title="Personalizar columnas"
         >
-          <SlidersHorizontal size={16} className="mr-1" />
-          <span className={ThemeConstants.text.xs}>Personalizar columnas</span>
+          <SlidersHorizontal size={12} className="mr-1" />
+          <span>Ajustar columnas</span>
+          <ChevronDown size={12} className="ml-1" />
         </button>
       </div>
       
-      {/* Menú de personalización de columnas */}
+      {/* Menú de personalización */}
       {columnMenuOpen && (
         <ColumnCustomizationMenu
           columns={columns}
@@ -798,12 +782,18 @@ const CustomizableTable = ({
           setVisibleColumns={setVisibleColumns}
           columnOrder={columnOrder}
           setColumnOrder={setColumnOrder}
+          columnWidths={columnWidths}
+          setColumnWidths={setColumnWidths}
+          minColumnWidth={minColumnWidth}
+          maxColumnWidth={maxColumnWidth}
           onClose={closeColumnMenu}
           position={columnMenuPosition}
         />
       )}
     </div>
   );
-};
+});
+
+CustomizableTable.displayName = 'CustomizableTable';
 
 export default CustomizableTable;

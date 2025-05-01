@@ -53,7 +53,7 @@ const Login = () => {
             type="text"
             value={username}
             onChange={(e) => setUsername(e.target.value)}
-            className={ThemeConstants.inputs.default}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
             placeholder="Usuario"
             required
           />
@@ -71,7 +71,7 @@ const Login = () => {
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className={ThemeConstants.inputs.default}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
             placeholder="Contraseña"
             required
           />
@@ -80,9 +80,7 @@ const Login = () => {
         <div>
           <button
             type="submit"
-            className={`w-full flex justify-center py-2 px-4 ${ThemeConstants.rounded.md} ${ThemeConstants.shadows.md} ${ThemeConstants.text.sm} font-medium ${
-              isLoading ? ThemeConstants.buttons.disabled : ThemeConstants.buttons.primary
-            } ${ThemeConstants.transitions.default}`}
+            className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
             disabled={isLoading}
           >
             {isLoading ? (
