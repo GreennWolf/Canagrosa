@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { loadTableConfig, saveTableConfig, resetTableConfig } from '../../utils/tableConfig';
+import { useLayoutAwareTableWidth } from '../../hooks/useContainerDimensions';
 
 const DEFAULT_COLUMNS = [
   // Basic Information (Visible by default)
@@ -163,6 +164,9 @@ const AdvancedUserTable = forwardRef(({
   const tableBodyRef = useRef(null);
   const tableHeaderRef = useRef(null);
   const resizeObserverRef = useRef(null);
+  
+  // Hook para calcular ancho máximo según el modo del layout
+  const maxTableWidth = useLayoutAwareTableWidth();
   
   // Estado del componente
   const [selectedRow, setSelectedRow] = useState(null);
@@ -417,31 +421,7 @@ const AdvancedUserTable = forwardRef(({
       return visibleColumns.reduce((total, col) => total + col.width, 0);
     };
     
-    // Calcular el ancho disponible real considerando el sidebar
-    const getAvailableWidth = () => {
-      const fullWidth = window.innerWidth;
-      
-      // Buscar el sidebar para determinar el ancho ocupado
-      const sidebar = document.querySelector('[class*="w-64"], [class*="w-20"]');
-      const isHeaderMode = !sidebar; // Si no hay sidebar, estamos en modo header
-      
-      if (isHeaderMode) {
-        // Modo header: usar 90% del ancho completo menos padding
-        return fullWidth * 0.9 - 48; // 48px = padding del contenedor (24px cada lado)
-      } else {
-        // Modo sidebar: determinar si está abierto o cerrado
-        const isSidebarOpen = sidebar && sidebar.classList.contains('w-64');
-        const sidebarWidth = isSidebarOpen ? 256 : 80; // w-64 = 256px, w-20 = 80px
-        
-        // Ancho disponible = ancho total - sidebar - padding del contenedor
-        const availableWidth = fullWidth - sidebarWidth - 48; // 48px = padding del main
-        
-        // Usar 95% del ancho disponible para la tabla
-        return availableWidth * 0.95;
-      }
-    };
-    
-    const maxTableWidth = getAvailableWidth();
+    // Usar el ancho máximo calculado por el hook
     
     // Cambiar el cursor durante el arrastre
     document.body.style.cursor = 'col-resize';

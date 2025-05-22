@@ -28,7 +28,6 @@ const SampleList = lazy(() => import('./pages/samples/SampleList'));
 const EnhancedSampleList = lazy(() => import('./pages/samples/EnhancedSampleList'));
 
 // Módulo de usuarios
-const UsersList = lazy(() => import('./pages/users/UsersList'));
 const EnhancedUsersList = lazy(() => import('./pages/users/EnhancedUsersList'));
 
 // Componente de carga

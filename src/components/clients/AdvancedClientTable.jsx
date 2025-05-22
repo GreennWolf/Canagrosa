@@ -18,7 +18,7 @@ import {
 } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { loadTableConfig, saveTableConfig, resetTableConfig } from '../../utils/tableConfig';
-import { useTableDimensions } from '../../hooks/useContainerDimensions';
+import { useLayoutAwareTableWidth } from '../../hooks/useContainerDimensions';
 
 const DEFAULT_COLUMNS = [
   // Basic Information (Visible by default)
@@ -211,14 +211,8 @@ const AdvancedClientTable = forwardRef(({
   const tableHeaderRef = useRef(null);
   const resizeObserverRef = useRef(null);
   
-  // Hook para dimensiones de tabla
-  const { 
-    containerRef: tableDimensionsRef, 
-    availableWidth
-  } = useTableDimensions({
-    padding: 24,
-    excludeElements: ['[data-actions-column]']
-  });
+  // Hook para calcular ancho máximo según el modo del layout
+  const maxTableWidth = useLayoutAwareTableWidth();
   
   // Estado del componente
   const [selectedRow, setSelectedRow] = useState(null);
@@ -511,8 +505,7 @@ const AdvancedClientTable = forwardRef(({
       return visibleColumns.reduce((total, col) => total + col.width, 0);
     };
     
-    // Usar el ancho disponible del hook
-    const maxTableWidth = availableWidth || window.innerWidth * 0.9;
+    // Usar el ancho máximo calculado por el hook
     
     // Función para manejar el movimiento del mouse con alta frecuencia
     const handleMouseMove = (moveEvent) => {
@@ -718,10 +711,6 @@ const AdvancedClientTable = forwardRef(({
       );
     }
 
-    // Calcular ancho total actual de las columnas visibles
-    const totalColumnsWidth = visibleColumns.reduce((total, col) => total + col.width, 0);
-    const rowWidth = Math.min(totalColumnsWidth, availableWidth || totalColumnsWidth);
-
     // Renderizado simple sin virtualización por ahora
     return (
       <div className="w-full">
@@ -731,8 +720,7 @@ const AdvancedClientTable = forwardRef(({
             className={`flex border-b border-gray-100 cursor-pointer transition-colors duration-150 ${getRowStyle(row, index)}`}
             style={{ 
               minHeight: '28px',
-              width: `${rowWidth}px`,
-              maxWidth: availableWidth ? `${availableWidth}px` : '100%'
+              width: '100%'
             }}
             onClick={() => handleRowClick(row)}
             onDoubleClick={() => handleRowDoubleClick(row)}
@@ -742,9 +730,9 @@ const AdvancedClientTable = forwardRef(({
                 key={`${row.ID_CLIENTE}-${column.id}`}
                 className="px-1.5 py-1 text-xs border-r border-gray-200 flex items-center"
                 style={{ 
-                  width: `${Math.min(column.width, (availableWidth || totalColumnsWidth) / visibleColumns.length)}px`,
-                  minWidth: '80px',
-                  maxWidth: `${Math.min(column.width, (availableWidth || totalColumnsWidth) / visibleColumns.length)}px`,
+                  width: `${column.width}px`,
+                  minWidth: `${column.width}px`,
+                  maxWidth: `${column.width}px`,
                   overflow: 'hidden',
                   textOverflow: 'ellipsis',
                   whiteSpace: 'nowrap'
@@ -806,31 +794,22 @@ const AdvancedClientTable = forwardRef(({
 
   return (
     <div 
-      ref={(el) => {
-        if (tableRef) tableRef.current = el;
-        if (tableDimensionsRef) tableDimensionsRef.current = el;
-      }}
+      ref={tableRef}
       className="w-full h-full flex flex-col border border-gray-200 rounded-md"
-      style={{
-        maxWidth: availableWidth ? `${availableWidth}px` : '100%',
-        overflow: 'hidden'
-      }}
     >
       <style>{scrollbarStyle}</style>
       {renderTableHeader()}
       
       <div 
         ref={tableBodyRef}
-        className="flex-grow overflow-hidden bg-white"
+        className="flex-grow overflow-auto custom-scrollbar bg-white"
         style={{
           height: '600px',
           minHeight: '500px',
           maxHeight: 'calc(100vh - 180px)'
         }}
       >
-        <div className="overflow-auto h-full w-full custom-scrollbar">
         {renderTableRows()}
-        </div>
       </div>
       
       <div className="bg-gray-50 border-t border-gray-200 px-3 py-1.5 text-xs text-gray-500 flex justify-between items-center">

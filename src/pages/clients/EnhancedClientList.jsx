@@ -840,7 +840,7 @@ const EnhancedClientList = () => {
       )}
       
       {/* Tabla de clientes avanzada */}
-      <div ref={tableContainerRef} className="flex-grow min-h-0">
+      <div ref={tableContainerRef} className="flex-1 overflow-hidden">
         <AdvancedClientTable
           ref={clientsTableRef}
           data={filteredClients}

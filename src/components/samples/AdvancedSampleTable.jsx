@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { loadTableConfig, saveTableConfig, resetTableConfig } from '../../utils/tableConfig';
+import { useLayoutAwareTableWidth } from '../../hooks/useContainerDimensions';
 
 const DEFAULT_COLUMNS = [
   // Basic Information (Visible by default)
@@ -235,6 +236,9 @@ const AdvancedSampleTable = forwardRef(({
   const tableBodyRef = useRef(null);
   const tableHeaderRef = useRef(null);
   const resizeObserverRef = useRef(null);
+  
+  // Hook para calcular ancho máximo según el modo del layout
+  const maxTableWidth = useLayoutAwareTableWidth();
   
   // Estado del componente
   const [selectedRow, setSelectedRow] = useState(null);
@@ -531,8 +535,7 @@ const AdvancedSampleTable = forwardRef(({
       return visibleColumns.reduce((total, col) => total + col.width, 0);
     };
     
-    // Ancho máximo permitido para la tabla (90% del viewport)
-    const maxTableWidth = window.innerWidth * 0.9;
+    // Usar el ancho máximo calculado por el hook
     
     // Función para manejar el movimiento del mouse con alta frecuencia
     const handleMouseMove = (moveEvent) => {

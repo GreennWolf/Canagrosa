@@ -130,66 +130,64 @@ const useContainerDimensions = ({
 };
 
 /**
- * Hook específico para tablas que necesitan cálculos de ancho de columnas
+ * Hook específico para detectar el modo del layout (sidebar/header)
+ * y calcular el ancho máximo apropiado para las tablas
  */
-export const useTableDimensions = (options = {}) => {
-  const dimensions = useContainerDimensions({
-    padding: 24, // Padding más ajustado para tablas
-    maxWidthPercentage: 1, // Usar todo el ancho disponible
-    ...options
-  });
+export const useLayoutAwareTableWidth = () => {
+  const [maxTableWidth, setMaxTableWidth] = useState(window.innerWidth * 0.9);
 
-  const calculateColumnWidths = useCallback((columns, visibleColumns, columnWidths = {}) => {
-    const { availableWidth } = dimensions;
+  const calculateMaxWidth = useCallback(() => {
+    // Detectar si estamos en modo header o sidebar
+    const isHeaderMode = localStorage.getItem('canagrosa-layout-type') === 'header';
     
-    if (!availableWidth || !columns?.length) {
-      return { columnWidths: {}, totalWidth: 0 };
+    if (isHeaderMode) {
+      // Modo header: más espacio disponible
+      return window.innerWidth * 0.95;
+    } else {
+      // Modo sidebar: menos espacio debido al sidebar + margen adicional
+      const sidebar = document.querySelector('[class*="w-64"], [class*="w-20"]');
+      const sidebarWidth = sidebar?.getBoundingClientRect().width || 64;
+      const availableWidth = window.innerWidth - sidebarWidth - 48 - 10; // 48px padding + 10px margen extra
+      return Math.min(availableWidth, window.innerWidth * 0.9);
     }
+  }, []);
 
-    // Calcular anchos de columnas con anchors fijos
-    const columnsWithFixedWidth = visibleColumns.filter(colId => {
-      const column = columns.find(c => c.id === colId || c.accessor === colId);
-      return columnWidths[colId] || column?.width;
-    });
-
-    const fixedWidth = columnsWithFixedWidth.reduce((sum, colId) => {
-      const customWidth = columnWidths[colId];
-      if (customWidth) return sum + customWidth;
-      
-      const column = columns.find(c => c.id === colId || c.accessor === colId);
-      return sum + (column?.width || 120);
-    }, 0);
-
-    // Calcular columnas flexibles
-    const flexColumns = visibleColumns.filter(colId => !columnsWithFixedWidth.includes(colId));
-    const remainingWidth = Math.max(0, availableWidth - fixedWidth);
-    const flexColumnWidth = flexColumns.length > 0 ? 
-      Math.max(80, remainingWidth / flexColumns.length) : 120;
-
-    // Construir objeto de anchos finales
-    const finalColumnWidths = {};
-    visibleColumns.forEach(colId => {
-      if (columnsWithFixedWidth.includes(colId)) {
-        finalColumnWidths[colId] = columnWidths[colId] || 
-          columns.find(c => c.id === colId || c.accessor === colId)?.width || 120;
-      } else {
-        finalColumnWidths[colId] = flexColumnWidth;
-      }
-    });
-
-    const totalWidth = Object.values(finalColumnWidths).reduce((sum, width) => sum + width, 0);
-
-    return {
-      columnWidths: finalColumnWidths,
-      totalWidth: Math.min(totalWidth, availableWidth),
-      maxTableWidth: availableWidth
+  useEffect(() => {
+    const updateMaxWidth = () => {
+      setMaxTableWidth(calculateMaxWidth());
     };
-  }, [dimensions]);
 
-  return {
-    ...dimensions,
-    calculateColumnWidths
-  };
+    // Calcular ancho inicial
+    updateMaxWidth();
+
+    // Escuchar cambios de tamaño de ventana
+    window.addEventListener('resize', updateMaxWidth);
+    
+    // Escuchar cambios en localStorage (modo layout)
+    const handleStorageChange = (e) => {
+      if (e.key === 'canagrosa-layout-type') {
+        updateMaxWidth();
+      }
+    };
+    window.addEventListener('storage', handleStorageChange);
+
+    // Observer para cambios en el DOM (sidebar toggle)
+    const observer = new MutationObserver(updateMaxWidth);
+    observer.observe(document.body, {
+      attributes: true,
+      attributeFilter: ['class'],
+      childList: true,
+      subtree: true
+    });
+
+    return () => {
+      window.removeEventListener('resize', updateMaxWidth);
+      window.removeEventListener('storage', handleStorageChange);
+      observer.disconnect();
+    };
+  }, [calculateMaxWidth]);
+
+  return maxTableWidth;
 };
 
 export default useContainerDimensions;
