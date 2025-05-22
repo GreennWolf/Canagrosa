@@ -13,4 +13,20 @@ export default defineConfig({
       '@': '/src',
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: undefined,
+      },
+    },
+  },
+  // Configuración para desarrollo
+  server: {
+    historyApiFallback: true,
+  },
+  // Configuración para preview
+  preview: {
+    port: 4173,
+    strictPort: true,
+  }
 })
