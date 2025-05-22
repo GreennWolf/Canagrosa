@@ -1,0 +1,249 @@
+/* Utilidades CSS para tablas responsivas - Canagrosa */
+
+/* Contenedor de tabla responsiva */
+.table-container {
+  overflow: hidden;
+  width: 100%;
+  max-width: 100%;
+}
+
+/* Scroll horizontal controlado */
+.table-scroll {
+  overflow-x: auto;
+  overflow-y: auto;
+  width: 100%;
+  max-width: 100%;
+}
+
+/* Tabla con ancho fijo */
+.table-fixed {
+  table-layout: fixed;
+  width: 100%;
+  max-width: 100%;
+}
+
+/* Celdas que respetan el ancho disponible */
+.table-cell-responsive {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 0.25rem 0.5rem;
+  border-right: 1px solid #e5e7eb;
+}
+
+/* Encabezados responsivos */
+.table-header-responsive {
+  position: sticky;
+  top: 0;
+  background-color: #f9fafb;
+  z-index: 10;
+  border-bottom: 1px solid #d1d5db;
+}
+
+/* Filas de tabla con hover */
+.table-row-responsive {
+  transition: background-color 0.15s ease-in-out;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.table-row-responsive:hover {
+  background-color: #f9fafb;
+}
+
+/* Filas seleccionadas */
+.table-row-selected {
+  background-color: #3b82f6 !important;
+  color: white;
+}
+
+.table-row-selected:hover {
+  background-color: #2563eb !important;
+}
+
+/* Scrollbar personalizada para tablas */
+.table-scrollbar::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.table-scrollbar::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 4px;
+}
+
+.table-scrollbar::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+  border: 1px solid #e2e8f0;
+}
+
+.table-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+.table-scrollbar::-webkit-scrollbar-corner {
+  background: #f1f5f9;
+}
+
+/* Soporte para Firefox */
+.table-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 #f1f5f9;
+}
+
+/* Contenedor de tabla con dimensiones limitadas */
+.table-viewport {
+  max-width: 100vw;
+  overflow: hidden;
+  position: relative;
+}
+
+/* Tabla flex para columnas responsivas */
+.table-flex {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 100%;
+}
+
+.table-flex-header {
+  display: flex;
+  flex-shrink: 0;
+  background-color: #f9fafb;
+  border-bottom: 1px solid #d1d5db;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.table-flex-body {
+  flex: 1;
+  overflow: auto;
+  max-height: calc(100vh - 200px);
+}
+
+.table-flex-row {
+  display: flex;
+  border-bottom: 1px solid #f3f4f6;
+  transition: background-color 0.15s ease-in-out;
+}
+
+.table-flex-row:hover {
+  background-color: #f9fafb;
+}
+
+.table-flex-cell {
+  flex: 0 0 auto;
+  padding: 0.5rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  border-right: 1px solid #e5e7eb;
+}
+
+/* Columnas redimensionables */
+.table-column-resizable {
+  position: relative;
+}
+
+.table-column-resizer {
+  position: absolute;
+  right: -2px;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  cursor: col-resize;
+  background-color: transparent;
+  z-index: 11;
+}
+
+.table-column-resizer:hover {
+  background-color: #3b82f6;
+}
+
+/* Estados de loading */
+.table-loading {
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.table-loading-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(255, 255, 255, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+}
+
+/* Responsive breakpoints */
+@media (max-width: 768px) {
+  .table-flex-cell {
+    min-width: 120px;
+    padding: 0.25rem;
+    font-size: 0.75rem;
+  }
+  
+  .table-column-resizer {
+    width: 6px;
+  }
+}
+
+@media (max-width: 640px) {
+  .table-flex-cell {
+    min-width: 100px;
+    padding: 0.25rem 0.5rem;
+  }
+}
+
+/* Utilidades para overflow y truncado */
+.truncate-cell {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.multiline-cell {
+  white-space: normal;
+  word-wrap: break-word;
+  max-height: 4rem;
+  overflow: hidden;
+}
+
+/* Animaciones suaves */
+.table-transition {
+  transition: all 0.15s ease-in-out;
+}
+
+/* Estados de foco para accesibilidad */
+.table-cell-focusable:focus {
+  outline: 2px solid #3b82f6;
+  outline-offset: -2px;
+}
+
+/* Helpers para anchos específicos */
+.w-fit-content {
+  width: fit-content;
+  max-width: 100%;
+}
+
+.min-w-0 {
+  min-width: 0;
+}
+
+/* Prevenir overflow horizontal en contenedores */
+.overflow-x-hidden {
+  overflow-x: hidden !important;
+}
+
+.overflow-x-auto {
+  overflow-x: auto !important;
+}
+
+.overflow-x-clip {
+  overflow-x: clip !important;
+}

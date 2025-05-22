@@ -1,21 +1,33 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   File, Paperclip, Upload, X, Download, Trash2, 
   AlertCircle, FileText, RotateCw, Image, Clock,
   Calendar, Search, Check
 } from 'lucide-react';
-import { useData } from '../../contexts/DataProvider';
+import adjuntosService from '../../services/adjuntosService';
+import ConfirmModal from '../common/ConfirmModal';
 
-const AdjuntosModal = ({ clientId, onClose }) => {
+const AdjuntosModal = ({ clientId }) => {
   const [files, setFiles] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filteredFiles, setFilteredFiles] = useState([]);
-  const fileInputRef = React.useRef(null);
+  const fileInputRef = useRef(null);
+  const abortControllerRef = useRef(null);
   
-  const { apiService } = useData();
+  // Estados para el modal de confirmación
+  const [confirmModal, setConfirmModal] = useState({
+    isOpen: false,
+    fileToDelete: null,
+    isDeleting: false
+  });
+
+  // Estado para previsualización
+  const [selectedFilePreview, setSelectedFilePreview] = useState(null);
+  
   
   // Cargar adjuntos al montar el componente
   useEffect(() => {
@@ -25,61 +37,59 @@ const AdjuntosModal = ({ clientId, onClose }) => {
       setIsLoading(true);
       setError(null);
       
+      // Cancelar solicitudes anteriores
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+      abortControllerRef.current = new AbortController();
+      
       try {
-        // Esta sería la llamada real a la API
-        // const response = await apiService.getAdjuntos(clientId);
-        // setFiles(response.data || []);
+        const fetchedFiles = await adjuntosService.obtenerPorCliente(
+          clientId, 
+          abortControllerRef.current.signal
+        );
         
-        // Simulación de datos
-        setTimeout(() => {
-          const mockFiles = [
-            {
-              id: 1,
-              filename: 'factura-2023-001.pdf',
-              size: 1240000,
-              type: 'application/pdf',
-              uploadDate: new Date('2023-12-15'),
-              description: 'Factura trimestral'
-            },
-            {
-              id: 2,
-              filename: 'contrato.docx',
-              size: 450000,
-              type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-              uploadDate: new Date('2023-10-05'),
-              description: 'Contrato de servicios'
-            },
-            {
-              id: 3,
-              filename: 'especificaciones-tecnicas.xlsx',
-              size: 820000,
-              type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-              uploadDate: new Date('2024-01-20'),
-              description: 'Especificaciones técnicas del proyecto'
-            },
-            {
-              id: 4,
-              filename: 'logo-cliente.png',
-              size: 340000,
-              type: 'image/png',
-              uploadDate: new Date('2023-09-12'),
-              description: 'Logo del cliente en alta resolución'
-            }
-          ];
-          
-          setFiles(mockFiles);
-          setFilteredFiles(mockFiles);
-          setIsLoading(false);
-        }, 800);
+        // Convertir fechas de string a Date si es necesario
+        const processedFiles = fetchedFiles.map(file => ({
+          ...file,
+          uploadDate: file.uploadDate ? new Date(file.uploadDate) : new Date(),
+          // Asegurar campos requeridos
+          description: file.description || '',
+          size: file.size || 0,
+          type: file.type || file.mimeType || 'application/octet-stream'
+        }));
+        
+        setFiles(processedFiles);
+        setFilteredFiles(processedFiles);
         
       } catch (err) {
+        // No mostrar error si la petición fue cancelada
+        if (err.name === 'CanceledError' || err.name === 'AbortError') {
+          return;
+        }
+        
         console.error('Error fetching attachments:', err);
-        setError('No se pudieron cargar los adjuntos. Por favor, intente nuevamente.');
+        setError(err.isFormatted ? err.message : 
+          'No se pudieron cargar los adjuntos. Por favor, intente nuevamente.');
+      } finally {
         setIsLoading(false);
       }
     };
     
     fetchFiles();
+    
+    // Cleanup al desmontar
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+      
+      // Limpiar todos los timeouts pendientes
+      Object.values(debounceTimeoutRef.current).forEach(timeout => {
+        if (timeout) clearTimeout(timeout);
+      });
+      debounceTimeoutRef.current = {};
+    };
   }, [clientId]);
   
   // Filtrar archivos cuando cambia el término de búsqueda
@@ -104,95 +114,180 @@ const AdjuntosModal = ({ clientId, onClose }) => {
     if (!selectedFiles || !selectedFiles.length) return;
     
     setIsUploading(true);
+    setUploadProgress(0);
     setError(null);
     
+    // Crear nuevo AbortController para esta subida
+    const uploadController = new AbortController();
+    
     try {
-      // Aquí iría el código real para subir los archivos al servidor
-      // const formData = new FormData();
-      // Array.from(selectedFiles).forEach(file => {
-      //   formData.append('files', file);
-      // });
-      // formData.append('clientId', clientId);
-      // const response = await apiService.uploadAdjuntos(formData);
+      // Crear FormData
+      const formData = new FormData();
+      Array.from(selectedFiles).forEach(file => {
+        formData.append('files', file);
+      });
       
-      // Simulación de subida
-      setTimeout(() => {
-        const newFiles = Array.from(selectedFiles).map((file, index) => ({
-          id: Date.now() + index,
-          filename: file.name,
-          size: file.size,
-          type: file.type,
-          uploadDate: new Date(),
-          description: ''
-        }));
-        
-        setFiles(prev => [...newFiles, ...prev]);
-        setFilteredFiles(prev => [...newFiles, ...prev]);
-        setIsUploading(false);
-        
-        // Limpiar el input de archivos
-        if (fileInputRef.current) {
-          fileInputRef.current.value = '';
-        }
-      }, 1500);
+      // Subir archivos
+      const uploadedFiles = await adjuntosService.subir(
+        clientId,
+        formData,
+        uploadController.signal,
+        setUploadProgress
+      );
+      
+      // Procesar archivos subidos
+      const processedFiles = uploadedFiles.map(file => ({
+        ...file,
+        uploadDate: file.uploadDate ? new Date(file.uploadDate) : new Date(),
+        description: file.description || '',
+        size: file.size || 0,
+        type: file.type || file.mimeType || 'application/octet-stream'
+      }));
+      
+      // Agregar los nuevos archivos al inicio de la lista
+      setFiles(prev => [...processedFiles, ...prev]);
+      setFilteredFiles(prev => [...processedFiles, ...prev]);
+      
+      // Limpiar el input de archivos
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
       
     } catch (err) {
+      // No mostrar error si la petición fue cancelada
+      if (err.name === 'CanceledError' || err.name === 'AbortError') {
+        return;
+      }
+      
       console.error('Error uploading files:', err);
-      setError('Error al subir los archivos. Por favor, intente nuevamente.');
+      setError(err.isFormatted ? err.message : 
+        'Error al subir los archivos. Por favor, intente nuevamente.');
+    } finally {
       setIsUploading(false);
+      setUploadProgress(0);
     }
   };
   
-  // Manejar la eliminación de un archivo
-  const handleDeleteFile = async (fileId) => {
+  // Abrir modal de confirmación para eliminar
+  const handleDeleteFile = (file) => {
+    setConfirmModal({
+      isOpen: true,
+      fileToDelete: file,
+      isDeleting: false
+    });
+  };
+
+  // Confirmar eliminación del archivo
+  const confirmDeleteFile = async () => {
+    if (!confirmModal.fileToDelete) return;
+    
+    setConfirmModal(prev => ({ ...prev, isDeleting: true }));
+    
     try {
-      // Esta sería la llamada real a la API
-      // await apiService.deleteAdjunto(fileId);
+      await adjuntosService.eliminar(confirmModal.fileToDelete.id);
       
-      // Simulación de eliminación
-      setFiles(prev => prev.filter(file => file.id !== fileId));
-      setFilteredFiles(prev => prev.filter(file => file.id !== fileId));
+      // Eliminar de la lista local
+      setFiles(prev => prev.filter(file => file.id !== confirmModal.fileToDelete.id));
+      setFilteredFiles(prev => prev.filter(file => file.id !== confirmModal.fileToDelete.id));
+      
+      // Cerrar modal
+      setConfirmModal({
+        isOpen: false,
+        fileToDelete: null,
+        isDeleting: false
+      });
       
     } catch (err) {
       console.error('Error deleting file:', err);
-      setError('Error al eliminar el archivo. Por favor, intente nuevamente.');
+      setError(err.isFormatted ? err.message : 
+        'Error al eliminar el archivo. Por favor, intente nuevamente.');
+      
+      // Mantener modal abierto pero no en estado de carga
+      setConfirmModal(prev => ({ ...prev, isDeleting: false }));
+    }
+  };
+
+  // Cerrar modal de confirmación
+  const closeConfirmModal = () => {
+    if (!confirmModal.isDeleting) {
+      setConfirmModal({
+        isOpen: false,
+        fileToDelete: null,
+        isDeleting: false
+      });
     }
   };
   
   // Manejar la descarga de un archivo
   const handleDownloadFile = async (file) => {
     try {
-      // En una implementación real, aquí se obtendría la URL del archivo
-      // const response = await apiService.getFileUrl(file.id);
-      // window.open(response.data.url, '_blank');
-      
-      // Simulación de descarga
-      alert(`Descargando: ${file.filename}`);
+      await adjuntosService.descargar(file.id, file.filename);
       
     } catch (err) {
       console.error('Error downloading file:', err);
-      setError('Error al descargar el archivo. Por favor, intente nuevamente.');
+      setError(err.isFormatted ? err.message : 
+        'Error al descargar el archivo. Por favor, intente nuevamente.');
     }
   };
+
+  // Manejar doble click para abrir archivo en nueva pestaña
+  const handleFileDoubleClick = async (file) => {
+    try {
+      // Crear una URL temporal con contenido simulado (funciona tanto en mock como real)
+      const content = `Contenido del archivo: ${file.filename}\nID: ${file.id}\nTamaño: ${file.size} bytes\nTipo: ${file.type}\n\nEste es un contenido de ejemplo para visualizar el archivo.`;
+      const blob = new Blob([content], { type: 'text/plain' });
+      const url = window.URL.createObjectURL(blob);
+      
+      // Abrir en nueva pestaña
+      window.open(url, '_blank');
+      
+      // Limpiar la URL después de un tiempo
+      setTimeout(() => {
+        window.URL.revokeObjectURL(url);
+      }, 1000);
+    } catch (err) {
+      console.error('Error opening file:', err);
+      setError(err.isFormatted ? err.message : 
+        'Error al abrir el archivo. Por favor, intente nuevamente.');
+    }
+  };
+
+  // Manejar click simple para previsualización
+  const handleFileClick = (file) => {
+    setSelectedFilePreview(file);
+  };
+  
+  // Refs para debounce de actualización de descripción
+  const debounceTimeoutRef = useRef({});
   
   // Manejar la actualización de la descripción de un archivo
-  const handleUpdateDescription = async (fileId, newDescription) => {
-    try {
-      // Esta sería la llamada real a la API
-      // await apiService.updateAdjuntoDescription(fileId, { description: newDescription });
-      
-      // Simulación de actualización
-      setFiles(prev => prev.map(file => 
-        file.id === fileId ? { ...file, description: newDescription } : file
-      ));
-      setFilteredFiles(prev => prev.map(file => 
-        file.id === fileId ? { ...file, description: newDescription } : file
-      ));
-      
-    } catch (err) {
-      console.error('Error updating file description:', err);
-      setError('Error al actualizar la descripción. Por favor, intente nuevamente.');
+  const handleUpdateDescription = (fileId, newDescription) => {
+    // Actualizar la UI inmediatamente
+    setFiles(prev => prev.map(file => 
+      file.id === fileId ? { ...file, description: newDescription } : file
+    ));
+    setFilteredFiles(prev => prev.map(file => 
+      file.id === fileId ? { ...file, description: newDescription } : file
+    ));
+    
+    // Limpiar timeout anterior para este archivo
+    if (debounceTimeoutRef.current[fileId]) {
+      clearTimeout(debounceTimeoutRef.current[fileId]);
     }
+    
+    // Crear nuevo timeout para la llamada a la API
+    debounceTimeoutRef.current[fileId] = setTimeout(async () => {
+      try {
+        await adjuntosService.actualizarDescripcion(fileId, newDescription);
+      } catch (err) {
+        console.error('Error updating file description:', err);
+        setError(err.isFormatted ? err.message : 
+          'Error al actualizar la descripción. Por favor, intente nuevamente.');
+      }
+      
+      // Limpiar el timeout después de la ejecución
+      delete debounceTimeoutRef.current[fileId];
+    }, 1000); // Esperar 1 segundo después de que el usuario deje de escribir
   };
   
   // Función para formatear el tamaño del archivo
@@ -226,6 +321,140 @@ const AdjuntosModal = ({ clientId, onClose }) => {
       minute: '2-digit'
     }).format(date);
   };
+
+  // Componente de previsualización
+  const FilePreview = ({ file }) => {
+    if (!file) {
+      return (
+        <div className="flex items-center justify-center h-full text-gray-500">
+          <div className="text-center">
+            <File size={48} className="mx-auto mb-2 text-gray-300" />
+            <p className="text-sm">Selecciona un archivo para previsualizar</p>
+          </div>
+        </div>
+      );
+    }
+
+    const isImage = file.type.startsWith('image/');
+    const isPdf = file.type === 'application/pdf';
+    const isText = file.type.startsWith('text/') || 
+                   file.type === 'application/json' || 
+                   file.filename.endsWith('.txt') || 
+                   file.filename.endsWith('.md');
+
+    return (
+      <div className="h-full flex flex-col">
+        {/* Header del archivo */}
+        <div className="border-b border-gray-200 p-3">
+          <div className="flex items-center space-x-2">
+            {getFileIcon(file.type)}
+            <div className="flex-1 min-w-0">
+              <h3 className="text-sm font-medium text-gray-900 truncate" title={file.filename}>
+                {file.filename}
+              </h3>
+              <p className="text-xs text-gray-500">
+                {formatFileSize(file.size)} • {formatDate(file.uploadDate)}
+              </p>
+            </div>
+            <button
+              onClick={() => handleFileDoubleClick(file)}
+              className="flex items-center px-2 py-1 text-xs bg-blue-50 text-blue-700 rounded hover:bg-blue-100 cursor-pointer"
+              title="Abrir en nueva pestaña"
+            >
+              <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+              </svg>
+              Abrir
+            </button>
+          </div>
+          {file.description && (
+            <p className="text-xs text-gray-600 mt-2 bg-gray-50 px-2 py-1 rounded">
+              {file.description}
+            </p>
+          )}
+        </div>
+
+        {/* Contenido de previsualización */}
+        <div className="flex-1 p-3 overflow-auto">
+          {isImage ? (
+            <div className="h-full">
+              {file.content && file.content.startsWith('data:') ? (
+                <div className="h-full flex flex-col">
+                  <img 
+                    src={file.content} 
+                    alt={file.filename}
+                    className="max-w-full max-h-full object-contain mx-auto"
+                    style={{ maxHeight: 'calc(100% - 60px)' }}
+                  />
+                  <p className="text-xs text-gray-500 text-center mt-2">
+                    Vista previa real de la imagen
+                  </p>
+                </div>
+              ) : (
+                <div className="flex items-center justify-center h-full">
+                  <div className="text-center">
+                    <Image size={64} className="mx-auto mb-4 text-blue-500" />
+                    <p className="text-sm text-gray-600 mb-2">Vista previa de imagen</p>
+                    <p className="text-xs text-gray-500">
+                      Haz doble click para ver en tamaño completo
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : isPdf ? (
+            <div className="flex items-center justify-center h-full">
+              <div className="text-center">
+                <FileText size={64} className="mx-auto mb-4 text-red-500" />
+                <p className="text-sm text-gray-600 mb-2">Documento PDF</p>
+                <p className="text-xs text-gray-500">
+                  Haz doble click para abrir el documento
+                </p>
+              </div>
+            </div>
+          ) : isText ? (
+            <div className="h-full">
+              {file.content ? (
+                <div className="h-full flex flex-col">
+                  <div className="flex-1 bg-gray-50 border border-gray-200 rounded p-3 overflow-auto">
+                    <pre className="text-xs text-gray-800 whitespace-pre-wrap font-mono">
+                      {file.content.length > 500 ? file.content.substring(0, 500) + '...' : file.content}
+                    </pre>
+                  </div>
+                  <p className="text-xs text-gray-500 text-center mt-2">
+                    Vista previa del contenido real del archivo
+                    {file.content.length > 500 && ' (primeros 500 caracteres)'}
+                  </p>
+                </div>
+              ) : (
+                <div className="flex items-center justify-center h-full">
+                  <div className="text-center">
+                    <FileText size={64} className="mx-auto mb-4 text-green-500" />
+                    <p className="text-sm text-gray-600 mb-2">Archivo de texto</p>
+                    <p className="text-xs text-gray-500">
+                      Haz doble click para ver el contenido
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="flex items-center justify-center h-full">
+              <div className="text-center">
+                <File size={64} className="mx-auto mb-4 text-gray-400" />
+                <p className="text-sm text-gray-600 mb-2">
+                  {file.type || 'Archivo'}
+                </p>
+                <p className="text-xs text-gray-500">
+                  Haz doble click para abrir
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
   
   return (
     <div className="h-full flex flex-col">
@@ -251,27 +480,38 @@ const AdjuntosModal = ({ clientId, onClose }) => {
             onChange={handleFileUpload}
             accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.gif"
           />
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            disabled={isUploading}
-            className={`flex items-center px-3 py-1 text-xs rounded ${
-              isUploading
-                ? 'bg-blue-300 text-white cursor-not-allowed'
-                : 'bg-blue-600 text-white hover:bg-blue-700'
-            }`}
-          >
-            {isUploading ? (
-              <>
-                <RotateCw size={14} className="mr-1 animate-spin" />
-                Subiendo...
-              </>
-            ) : (
-              <>
-                <Upload size={14} className="mr-1" />
-                Subir archivo
-              </>
+          <div className="relative">
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isUploading}
+              className={`flex items-center px-3 py-1 text-xs rounded ${
+                isUploading
+                  ? 'bg-blue-300 text-white cursor-not-allowed'
+                  : 'bg-blue-600 text-white hover:bg-blue-700'
+              }`}
+            >
+              {isUploading ? (
+                <>
+                  <RotateCw size={14} className="mr-1 animate-spin" />
+                  Subiendo... {uploadProgress}%
+                </>
+              ) : (
+                <>
+                  <Upload size={14} className="mr-1" />
+                  Subir archivo
+                </>
+              )}
+            </button>
+            
+            {isUploading && (
+              <div className="absolute -bottom-1 left-0 w-full h-1 bg-gray-200 rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-blue-600 transition-all duration-300 ease-out"
+                  style={{ width: `${uploadProgress}%` }}
+                />
+              </div>
             )}
-          </button>
+          </div>
         </div>
       </div>
       
@@ -283,19 +523,21 @@ const AdjuntosModal = ({ clientId, onClose }) => {
         </div>
       )}
       
-      {/* Lista de archivos */}
-      <div className="bg-white border border-gray-200 rounded-md overflow-hidden flex-grow">
-        {/* Cabecera de la tabla */}
-        <div className="bg-gray-50 border-b border-gray-200 grid grid-cols-12 text-xs font-medium text-gray-700 py-2 px-3">
-          <div className="col-span-5">Nombre</div>
-          <div className="col-span-3">Descripción</div>
-          <div className="col-span-2">Fecha</div>
-          <div className="col-span-1 text-center">Tamaño</div>
-          <div className="col-span-1 text-center">Acciones</div>
-        </div>
-        
-        {/* Contenido de la tabla */}
-        <div className="overflow-y-auto max-h-72">
+      {/* Contenido principal: tabla y previsualización */}
+      <div className="flex-grow flex gap-4 min-h-0">
+        {/* Lista de archivos - más pequeña */}
+        <div className="w-3/5 bg-white border border-gray-200 rounded-md overflow-hidden flex flex-col">
+          {/* Cabecera de la tabla */}
+          <div className="bg-gray-50 border-b border-gray-200 grid grid-cols-12 text-xs font-medium text-gray-700 py-2 px-3">
+            <div className="col-span-5">Nombre</div>
+            <div className="col-span-3">Descripción</div>
+            <div className="col-span-2">Fecha</div>
+            <div className="col-span-1 text-center">Tamaño</div>
+            <div className="col-span-1 text-center">Acciones</div>
+          </div>
+          
+          {/* Contenido de la tabla */}
+          <div className="flex-grow overflow-y-auto">
           {isLoading ? (
             <div className="flex justify-center items-center p-8">
               <div className="flex flex-col items-center">
@@ -311,11 +553,18 @@ const AdjuntosModal = ({ clientId, onClose }) => {
             filteredFiles.map((file) => (
               <div 
                 key={file.id} 
-                className="grid grid-cols-12 text-xs border-b border-gray-200 py-2 px-3 hover:bg-gray-50"
+                className={`grid grid-cols-12 text-xs border-b border-gray-200 py-2 px-3 cursor-pointer transition-colors ${
+                  selectedFilePreview?.id === file.id 
+                    ? 'bg-blue-50 border-blue-200' 
+                    : 'hover:bg-gray-50'
+                }`}
+                onClick={() => handleFileClick(file)}
+                onDoubleClick={() => handleFileDoubleClick(file)}
+                title="Click para previsualizar, doble click para abrir"
               >
                 <div className="col-span-5 flex items-center space-x-2">
                   {getFileIcon(file.type)}
-                  <div className="truncate" title={file.filename}>{file.filename}</div>
+                  <div className="truncate text-gray-800 font-medium" title={file.filename}>{file.filename}</div>
                 </div>
                 
                 <div className="col-span-3">
@@ -346,7 +595,7 @@ const AdjuntosModal = ({ clientId, onClose }) => {
                     <Download size={14} />
                   </button>
                   <button
-                    onClick={() => handleDeleteFile(file.id)}
+                    onClick={() => handleDeleteFile(file)}
                     title="Eliminar"
                     className="p-1 text-red-600 hover:text-red-800 rounded-full hover:bg-red-100"
                   >
@@ -356,8 +605,53 @@ const AdjuntosModal = ({ clientId, onClose }) => {
               </div>
             ))
           )}
+          </div>
+        </div>
+
+        {/* Sección de previsualización */}
+        <div className="w-2/5 bg-white border border-gray-200 rounded-md overflow-hidden flex flex-col">
+          <div className="bg-gray-50 border-b border-gray-200 px-3 py-2">
+            <h3 className="text-xs font-medium text-gray-700">Previsualización</h3>
+          </div>
+          <div className="flex-grow">
+            <FilePreview file={selectedFilePreview} />
+          </div>
         </div>
       </div>
+      
+      {/* Modal de confirmación para eliminar */}
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        onClose={closeConfirmModal}
+        onConfirm={confirmDeleteFile}
+        title="Eliminar archivo adjunto"
+        message="¿Está seguro de que desea eliminar este archivo? Esta acción no se puede deshacer."
+        confirmText="Eliminar archivo"
+        cancelText="Cancelar"
+        type="danger"
+        isProcessing={confirmModal.isDeleting}
+      >
+        {confirmModal.fileToDelete && (
+          <div className="mt-3 p-3 bg-gray-50 rounded-md border border-gray-200">
+            <div className="flex items-center space-x-2">
+              {getFileIcon(confirmModal.fileToDelete.type)}
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-gray-900 truncate">
+                  {confirmModal.fileToDelete.filename}
+                </p>
+                <p className="text-xs text-gray-500">
+                  {formatFileSize(confirmModal.fileToDelete.size)} • {formatDate(confirmModal.fileToDelete.uploadDate)}
+                </p>
+                {confirmModal.fileToDelete.description && (
+                  <p className="text-xs text-gray-600 mt-1">
+                    {confirmModal.fileToDelete.description}
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+      </ConfirmModal>
     </div>
   );
 };

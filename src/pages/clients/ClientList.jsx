@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { 
   Search, 
   Plus, 
@@ -13,16 +13,19 @@ import {
   Filter,
   CheckCircle,
   XCircle,
-  Eye,
   ChevronDown,
   User,
   ListFilter,
   AlertCircle,
-  Loader
+  Loader,
+  Copy
 } from 'lucide-react';
-import CustomizableTable from '../../components/common/CustomizableTable';
 import SelectInput from '../../components/common/SelectInput';
+import ClientsTable from '../../components/clients/ClientsTable';
+import useOptimizedFilter from '../../hooks/useOptimizedFilter';
+import { debounce } from '../../utils/optimizations';
 import { useModal } from '../../contexts/ModalContext';
+import ConfirmDialog from '../../components/common/ConfirmDialog';
 import clientesService from '../../services/clientesService';
 import ClientDetail from '../../components/clients/ClientDetail';
 import ClientForm from '../../components/clients/ClientForm';
@@ -31,6 +34,9 @@ import ThemeConstants from '../../constants/ThemeConstants';
 const ClientList = () => {
   // Referencias
   const clientsTableRef = useRef(null);
+  
+  // Estado de UI
+  const [selectedClient, setSelectedClient] = useState(null);
 
   // Estado para la lista y filtrado de clientes
   const [clients, setClients] = useState([]);
@@ -38,7 +44,6 @@ const ClientList = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [error, setError] = useState(null);
-  const [selectedClient, setSelectedClient] = useState(null);
   const [showFilters, setShowFilters] = useState(false);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
@@ -48,7 +53,14 @@ const ClientList = () => {
     CIF: '',
     TELEFONO: '',
     EMAIL: '',
-    ANULADO: ''
+    ANULADO: '',
+    FACTURA_DETERMINACIONES: '',
+    EADS: '',
+    AIRBUS: '',
+    IBERIA: '',
+    AGROALIMENTARIO: '',
+    EXTRANJERO: '',
+    INTRA: ''
   });
   
   // Opciones para los filtros
@@ -63,7 +75,7 @@ const ClientList = () => {
   const { openModal, closeModal } = useModal();
   
   // Función para cargar clientes (primera página)
-  const fetchClients = useCallback(async (forceRefresh = false) => {
+  const fetchClients = useCallback(async (forceRefresh = false, signal) => {
     setIsLoading(true);
     setError(null);
     setPage(1); // Resetear a la primera página
@@ -77,24 +89,50 @@ const ClientList = () => {
         return acc;
       }, {});
       
-      const response = await clientesService.obtenerTodos(activeFilters);
+      const response = await clientesService.obtenerTodos(activeFilters, signal);
+      
+      // Comprobar si la operación fue cancelada antes de actualizar el estado
+      if (signal && signal.aborted) {
+        console.log('Operación cancelada, no actualizando estado');
+        return;
+      }
       
       // Ajustar para manejar la respuesta directa en vez de response.data
       const clientesData = response || [];
       setClients(clientesData);
       setFilteredClients(clientesData);
-      setHasMore(false); // Por ahora asumimos que no hay paginación
+      
+      // Verificar si hay más datos disponibles (podría implementarse lógica de paginación)
+      // Por ejemplo, si el API devuelve un límite fijo de registros, podríamos asumir que hay más
+      const PAGE_SIZE = 50; // Número hipotético de resultados por página
+      
+      // Para testing: simular que siempre hay más datos si tenemos al menos 5 clientes
+      setHasMore(clientesData.length >= 5); // Para propósitos de prueba
       setTotalCount(clientesData.length);
+      
+      // Limpiar cualquier error previo
+      setError(null);
       
       // Actualizar opciones para los filtros solo si no hay filtros activos
       if (Object.keys(activeFilters).length === 0) {
         updateFilterOptions(clientesData);
       }
     } catch (err) {
+      // No mostrar error si la petición fue cancelada intencionalmente
+      if (err.name === 'CanceledError' || err.name === 'AbortError') {
+        console.log('Operación cancelada por el usuario');
+        return;
+      }
+      
       console.error('Error fetching clients:', err);
-      setError('No se pudieron cargar los clientes. Por favor, intente de nuevo más tarde.');
+      
+      // Usar el mensaje de error formateado si está disponible
+      setError(err.isFormatted ? err.message : 
+        'No se pudieron cargar los clientes. Por favor, intente de nuevo más tarde.');
     } finally {
-      setIsLoading(false);
+      if (!(signal && signal.aborted)) {
+        setIsLoading(false);
+      }
     }
   }, [filters]);
   
@@ -106,16 +144,49 @@ const ClientList = () => {
     setIsLoadingMore(true);
     
     try {
-      // Por ahora asumimos que no hay paginación en los nuevos servicios
-      // En el futuro se podría implementar
-      return false;
+      // Preparar filtros activos
+      const activeFilters = Object.entries(filters).reduce((acc, [key, value]) => {
+        if (value !== '') {
+          acc[key] = value;
+        }
+        return acc;
+      }, {});
+      
+      // Añadir parámetros de paginación
+      const nextPage = page + 1;
+      const paginationParams = {
+        ...activeFilters,
+        page: nextPage,
+        limit: 50 // Mismo tamaño de página que en fetchClients
+      };
+      
+      // Llamar a la API con parámetros de paginación
+      const response = await clientesService.obtenerTodos(paginationParams);
+      const newData = response || [];
+      
+      if (newData.length > 0) {
+        // Actualizar estado con los nuevos datos
+        setClients(prevClients => [...prevClients, ...newData]);
+        setFilteredClients(prevFiltered => [...prevFiltered, ...newData]);
+        setPage(nextPage);
+        
+        // Verificar si hay más datos para cargar
+        const PAGE_SIZE = 50;
+        setHasMore(newData.length >= PAGE_SIZE);
+        
+        return true; // Indicar éxito
+      } else {
+        // No hay más datos
+        setHasMore(false);
+        return false;
+      }
     } catch (err) {
       console.error('Error loading more clients:', err);
       return false; // Indicar fallo
     } finally {
       setIsLoadingMore(false);
     }
-  }, [filters, page, hasMore, isLoadingMore]);
+  }, [filters, page, hasMore, isLoadingMore, clientesService]);
   
   // Actualizar opciones para los filtros
   const updateFilterOptions = useCallback((clientsData) => {
@@ -147,42 +218,88 @@ const ClientList = () => {
     });
   }, []);
   
-  // Cargar clientes al montar el componente
+  // Optimización de filtrado con hook personalizado
+  const filterFunctions = useMemo(() => ({
+    NOMBRE: (value, filterValue) => 
+      !filterValue || (value && value.toLowerCase().includes(filterValue.toLowerCase())),
+    CIF: (value, filterValue) => 
+      !filterValue || (value && value.toLowerCase().includes(filterValue.toLowerCase())),
+    TELEFONO: (value, filterValue) => 
+      !filterValue || (value && value.toLowerCase().includes(filterValue.toLowerCase())),
+    EMAIL: (value, filterValue) => 
+      !filterValue || (value && value.toLowerCase().includes(filterValue.toLowerCase())),
+  }), []);
+  
+  const { 
+    filteredData: optimizedFilteredClients, 
+    totalCount: optimizedTotalCount, 
+    performance 
+  } = useOptimizedFilter(
+    clients,
+    filters,
+    filterFunctions,
+    { debounceTime: 300, paginate: false }
+  );
+  
+  // Usar datos filtrados optimizados solo cuando hay filtros avanzados
+  // De lo contrario usar la búsqueda local que es más rápida
   useEffect(() => {
-    fetchClients();
-  }, [fetchClients]);
+    const hasComplexFilters = Object.entries(filters).some(([key, value]) => 
+      value !== '' && key !== 'NOMBRE'
+    );
+    
+    if (hasComplexFilters) {
+      setFilteredClients(optimizedFilteredClients);
+    }
+  }, [optimizedFilteredClients, filters]);
+  
+  // Cargar clientes al montar el componente con cancelación de petición
+  useEffect(() => {
+    const controller = new AbortController();
+    fetchClients(false, controller.signal);
+    
+    return () => {
+      controller.abort();
+    };
+  }, []);
   
   // Búsqueda local para filtrar clientes sin llamar a la API
-  const handleLocalSearch = useCallback((searchText) => {
-    if (!searchText.trim()) {
-      setFilteredClients(clients);
-      return;
-    }
-    
-    const searchLower = searchText.toLowerCase();
-    const filtered = clients.filter(client => {
-      const nameMatch = client.NOMBRE?.toLowerCase().includes(searchLower);
-      const cifMatch = client.CIF?.toLowerCase().includes(searchLower);
-      const phoneMatch = client.TELEFONO?.toLowerCase().includes(searchLower);
-      const emailMatch = client.EMAIL?.toLowerCase().includes(searchLower);
+  const handleLocalSearch = useMemo(() => 
+    debounce((searchText) => {
+      if (!searchText.trim()) {
+        setFilteredClients(clients);
+        return;
+      }
       
-      return nameMatch || cifMatch || phoneMatch || emailMatch;
-    });
-    
-    setFilteredClients(filtered);
-  }, [clients]);
+      const searchLower = searchText.toLowerCase();
+      const filtered = clients.filter(client => {
+        const nameMatch = client.NOMBRE?.toLowerCase().includes(searchLower);
+        const cifMatch = client.CIF?.toLowerCase().includes(searchLower);
+        const phoneMatch = client.TELEFONO?.toLowerCase().includes(searchLower);
+        const emailMatch = client.EMAIL?.toLowerCase().includes(searchLower);
+        
+        return nameMatch || cifMatch || phoneMatch || emailMatch;
+      });
+      
+      setFilteredClients(filtered);
+    }, 300), // 300ms de debounce
+  [clients]);
   
   // Manejar cambios en los filtros
   const handleFilterChange = (e) => {
-    const { name, value } = e.target;
-    setFilters(prev => ({
-      ...prev,
-      [name]: value
-    }));
+    const { name, value, type, checked } = e.target;
     
-    // Si cambia el filtro de nombre, hacer una búsqueda local
-    if (name === 'NOMBRE') {
-      handleLocalSearch(value);
+    // Para checkboxes
+    if (type === 'checkbox') {
+      setFilters(prev => ({
+        ...prev,
+        [name]: checked ? '1' : ''
+      }));
+    } else {
+      setFilters(prev => ({
+        ...prev,
+        [name]: value
+      }));
     }
   };
   
@@ -193,10 +310,32 @@ const ClientList = () => {
       CIF: '',
       TELEFONO: '',
       EMAIL: '',
-      ANULADO: ''
+      ANULADO: '',
+      FACTURA_DETERMINACIONES: '',
+      EADS: '',
+      AIRBUS: '',
+      IBERIA: '',
+      AGROALIMENTARIO: '',
+      EXTRANJERO: '',
+      INTRA: ''
     });
     setFilteredClients(clients);
   };
+  
+  // Aplicar filtros
+  useEffect(() => {
+    // Solo hacer búsqueda local para nombre
+    if (filters.NOMBRE && !filters.CIF && !filters.TELEFONO && !filters.EMAIL && !filters.ANULADO && 
+        !filters.FACTURA_DETERMINACIONES && !filters.EADS && !filters.AIRBUS && !filters.IBERIA && 
+        !filters.AGROALIMENTARIO && !filters.EXTRANJERO && !filters.INTRA) {
+      handleLocalSearch(filters.NOMBRE);
+    } else {
+      // Para otros filtros, recargar desde la API
+      fetchClients();
+    }
+  }, [filters.CIF, filters.TELEFONO, filters.EMAIL, filters.ANULADO, 
+      filters.FACTURA_DETERMINACIONES, filters.EADS, filters.AIRBUS, filters.IBERIA, 
+      filters.AGROALIMENTARIO, filters.EXTRANJERO, filters.INTRA, fetchClients]);
   
   // Abrir modal para crear cliente
   const handleOpenCreateModal = () => {
@@ -259,38 +398,41 @@ const ClientList = () => {
     });
   };
   
+  // Estado para el proceso de eliminación
+  const [isDeleting, setIsDeleting] = useState(false);
+  
   // Abrir modal de confirmación para eliminar cliente
   const handleOpenDeleteConfirmation = (client) => {
     openModal('deleteClient', {
       title: 'Confirmar eliminación',
       size: 'sm',
       content: (
-        <div className="p-4">
-          <div className="flex items-start mb-4">
-            <AlertCircle className="text-red-500 mr-3 flex-shrink-0" size={20} />
-            <div>
-              <p className="text-gray-800 font-medium">¿Está seguro de eliminar este cliente?</p>
-              <p className="text-gray-600 mt-1">Esta acción no se puede deshacer.</p>
-              <p className="font-medium text-gray-800 mt-2">{client.NOMBRE}</p>
+        <ConfirmDialog
+          title="Confirmar eliminación"
+          message="¿Está seguro de eliminar este cliente? Esta acción no se puede deshacer."
+          type="danger"
+          confirmLabel="Eliminar"
+          cancelLabel="Cancelar"
+          isProcessing={isDeleting}
+          additionalContent={
+            <div className="p-2 mt-2 bg-gray-100 rounded-md border border-gray-200">
+              <p className="font-medium text-gray-800">{client.NOMBRE}</p>
+              {client.CIF && <p className="text-sm text-gray-600">CIF/NIF: {client.CIF}</p>}
+              {client.DIRECCION && <p className="text-sm text-gray-600">{client.DIRECCION}</p>}
             </div>
-          </div>
-          
-          <div className="flex justify-end space-x-3 mt-6">
-            <button
-              onClick={() => closeModal('deleteClient')}
-              className="px-3 py-1.5 border border-gray-300 rounded text-gray-700 hover:bg-gray-50 text-sm"
-            >
-              Cancelar
-            </button>
-            <button
-              onClick={() => handleDeleteClient(client)}
-              className="px-3 py-1.5 bg-red-600 rounded text-white hover:bg-red-700 text-sm flex items-center"
-            >
-              <Trash2 size={16} className="mr-1" />
-              Eliminar
-            </button>
-          </div>
-        </div>
+          }
+          onConfirm={async () => {
+            setIsDeleting(true);
+            try {
+              await handleDeleteClient(client);
+            } finally {
+              setIsDeleting(false);
+            }
+          }}
+          onCancel={() => {
+            closeModal('deleteClient');
+          }}
+        />
       )
     });
   };
@@ -308,18 +450,24 @@ const ClientList = () => {
         showCloseButton: false,
         content: (
           <div className="p-4 text-center">
-            <CheckCircle className="text-green-500 mx-auto mb-3" size={40} />
+            <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-green-100 flex items-center justify-center">
+              <CheckCircle className="text-green-500" size={24} />
+            </div>
             <p className="text-gray-800">El cliente ha sido eliminado correctamente.</p>
           </div>
         )
       });
       
-      // Cerrar el mensaje después de un tiempo
+      // Cerrar el mensaje después de un tiempo y actualizar la lista
       setTimeout(() => {
         closeModal('successDelete');
-        fetchClients(true);
+        if (clientsTableRef.current) {
+          clientsTableRef.current.setSelectedRow(null); // Limpiar la selección de la tabla
+        }
+        fetchClients(true); // Actualizar la lista completa
       }, 1500);
       
+      return true; // Indicar éxito para el flujo de confirmación
     } catch (error) {
       console.error('Error deleting client:', error);
       
@@ -330,10 +478,16 @@ const ClientList = () => {
         content: (
           <div className="p-4">
             <div className="flex items-start">
-              <AlertCircle className="text-red-500 mr-3 flex-shrink-0" size={20} />
-              <p className="text-gray-800">
-                No se pudo eliminar el cliente. {error.message || 'Inténtelo de nuevo más tarde.'}
-              </p>
+              <div className="w-10 h-10 flex-shrink-0 mr-3 rounded-full bg-red-100 flex items-center justify-center">
+                <AlertCircle className="text-red-500" size={20} />
+              </div>
+              <div>
+                <p className="text-gray-800 font-medium">No se pudo eliminar el cliente</p>
+                <p className="text-gray-600 mt-1">
+                  {error.isFormatted ? error.message : 
+                    error.message || 'Ha ocurrido un error inesperado. Inténtelo de nuevo más tarde.'}
+                </p>
+              </div>
             </div>
             <div className="flex justify-end mt-4">
               <button
@@ -346,138 +500,31 @@ const ClientList = () => {
           </div>
         )
       });
+      
+      throw error; // Propagar el error para el flujo de confirmación
     }
   };
-  
-  // Definición de columnas para la tabla
-  const columns = [
-    {
-      accessor: 'ID_CLIENTE',
-      header: 'ID',
-      width: 'w-16'
-    },
-    {
-      accessor: 'NOMBRE',
-      header: 'Nombre',
-      render: (row) => (
-        <div className="flex items-center text-gray-800">
-          <Building size={12} className="mr-1 text-gray-500 flex-shrink-0" />
-          <span className="truncate">{row.NOMBRE || '-'}</span>
-        </div>
+
+  // Abrir modal para clonar cliente
+  const handleCloneClient = (client) => {
+    if (!client) return;
+    
+    openModal('cloneClient', {
+      title: `Clonar Cliente: ${client.NOMBRE}`,
+      size: '2xl',
+      content: (
+        <ClientForm 
+          isClone={true}
+          cloneData={client}
+          onSuccess={() => {
+            closeModal('cloneClient');
+            fetchClients(true);
+          }}
+          onCancel={() => closeModal('cloneClient')}
+        />
       )
-    },
-    {
-      accessor: 'DIRECCION',
-      header: 'Dirección',
-      render: (row) => (
-        <div className="flex items-center text-gray-800">
-          <MapPin size={12} className="mr-1 text-gray-500 flex-shrink-0" />
-          <span className="truncate">{row.DIRECCION || '-'}</span>
-        </div>
-      )
-    },
-    {
-      accessor: 'COD_POSTAL',
-      header: 'CP',
-      width: 'w-20',
-    },
-    {
-      accessor: 'CIF',
-      header: 'CIF/NIF',
-      render: (row) => (
-        <div className="flex items-center text-gray-800">
-          <Hash size={12} className="mr-1 text-gray-500 flex-shrink-0" />
-          <span>{row.CIF || '-'}</span>
-        </div>
-      ),
-      width: 'w-32'
-    },
-    {
-      accessor: 'TELEFONO',
-      header: 'Teléfono',
-      render: (row) => (
-        <div className="flex items-center text-gray-800">
-          <Phone size={12} className="mr-1 text-gray-500 flex-shrink-0" />
-          <span>{row.TELEFONO || '-'}</span>
-        </div>
-      ),
-      width: 'w-28'
-    },
-    {
-      accessor: 'EMAIL',
-      header: 'Email',
-      render: (row) => (
-        <div className="flex items-center text-gray-800">
-          <AtSign size={12} className="mr-1 text-gray-500 flex-shrink-0" />
-          <span className="truncate">{row.EMAIL || '-'}</span>
-        </div>
-      )
-    },
-    {
-      accessor: 'RESPONSABLE',
-      header: 'Responsable',
-      render: (row) => (
-        <div className="flex items-center text-gray-800">
-          <User size={12} className="mr-1 text-gray-500 flex-shrink-0" />
-          <span className="truncate">{row.RESPONSABLE || '-'}</span>
-        </div>
-      )
-    },
-    {
-      accessor: 'ANULADO',
-      header: 'Estado',
-      render: (row) => (
-        row.ANULADO === 1 
-          ? <div className="flex items-center text-red-600"><XCircle size={12} className="mr-1 flex-shrink-0" />Anulado</div>
-          : <div className="flex items-center text-green-600"><CheckCircle size={12} className="mr-1 flex-shrink-0" />Activo</div>
-      ),
-      width: 'w-24'
-    },
-    {
-      accessor: 'actions',
-      header: 'Acciones',
-      render: (row) => (
-        <div className="flex items-center space-x-2 justify-end">
-          <button 
-            onClick={(e) => {
-              e.stopPropagation();
-              handleViewClient(row);
-            }}
-            className="p-1 text-blue-600 hover:text-blue-800 rounded-full hover:bg-blue-100"
-            title="Ver detalle"
-          >
-            <Eye size={14} />
-          </button>
-          <button 
-            onClick={(e) => {
-              e.stopPropagation();
-              handleOpenEditModal(row);
-            }}
-            className="p-1 text-green-600 hover:text-green-800 rounded-full hover:bg-green-100"
-            title="Editar"
-          >
-            <Edit size={14} />
-          </button>
-          <button 
-            onClick={(e) => {
-              e.stopPropagation();
-              handleOpenDeleteConfirmation(row);
-            }}
-            className="p-1 text-red-600 hover:text-red-800 rounded-full hover:bg-red-100"
-            title="Eliminar"
-          >
-            <Trash2 size={14} />
-          </button>
-        </div>
-      ),
-      width: 'w-28'
-    }
-  ];
-  
-  // Columnas visibles por defecto
-  const defaultVisibleColumns = [
-    'ID_CLIENTE', 'NOMBRE', 'DIRECCION', 'TELEFONO', 'CIF', 'ANULADO', 'actions'
-  ];
+    });
+  };
 
   // Opciones para los filtros
   const statusOptions = [
@@ -487,45 +534,72 @@ const ClientList = () => {
   ];
 
   return (
-    <div className="h-full flex flex-col overflow-y-hidden">
+    <div className="h-full flex flex-col overflow-hidden"
+         style={{ height: 'calc(100vh - 120px)' }}>
       {/* Barra de herramientas compacta */}
-      <div className="bg-white shadow rounded-md p-1 flex flex-wrap items-center gap-1 mb-1">
-        <div className="flex items-center space-x-1">
+      <div className="bg-slate-800 shadow rounded-md p-2 flex flex-wrap items-center gap-2 mb-1">
+        <div className="flex items-center space-x-2">
           <button 
             onClick={handleOpenCreateModal}
-            className="flex items-center px-2 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700"
+            className="flex items-center px-3 py-1.5 text-xs bg-green-600 text-white rounded hover:bg-green-700"
             title="Nuevo cliente"
           >
             <Plus size={14} className="mr-1" />
-            <span className="hidden sm:inline">Nuevo</span>
+            <span>Nuevo cliente</span>
           </button>
           
           <button 
-            onClick={() => handleOpenEditModal(selectedClient)}
+            onClick={() => {
+              if (selectedClient) {
+                handleOpenEditModal(selectedClient);
+              }
+            }}
             disabled={!selectedClient}
             title="Editar cliente"
-            className={`flex items-center px-2 py-1 text-xs rounded ${
+            className={`flex items-center px-3 py-1.5 text-xs rounded ${
               selectedClient 
                 ? "bg-blue-600 text-white hover:bg-blue-700" 
-                : "bg-gray-200 text-gray-500 cursor-not-allowed"
+                : "bg-gray-600 text-gray-300 opacity-50 cursor-not-allowed"
             }`}
           >
-            <Edit size={14} />
-            <span className="hidden sm:inline ml-1">Editar</span>
+            <Edit size={14} className="mr-1" />
+            <span>Editar</span>
           </button>
           
           <button 
-            onClick={() => selectedClient && handleOpenDeleteConfirmation(selectedClient)}
+            onClick={() => {
+              if (selectedClient) {
+                handleCloneClient(selectedClient);
+              }
+            }}
             disabled={!selectedClient}
-            title="Eliminar cliente"
-            className={`flex items-center px-2 py-1 text-xs rounded ${
+            title="Clonar cliente"
+            className={`flex items-center px-3 py-1.5 text-xs rounded ${
               selectedClient 
-                ? "bg-red-600 text-white hover:bg-red-700" 
-                : "bg-gray-200 text-gray-500 cursor-not-allowed"
+                ? "bg-purple-600 text-white hover:bg-purple-700" 
+                : "bg-gray-600 text-gray-300 opacity-50 cursor-not-allowed"
             }`}
           >
-            <Trash2 size={14} />
-            <span className="hidden sm:inline ml-1">Eliminar</span>
+            <Copy size={14} className="mr-1" />
+            <span>Clonar</span>
+          </button>
+          
+          <button 
+            onClick={() => {
+              if (selectedClient) {
+                handleOpenDeleteConfirmation(selectedClient);
+              }
+            }}
+            disabled={!selectedClient}
+            title="Eliminar cliente"
+            className={`flex items-center px-3 py-1.5 text-xs rounded ${
+              selectedClient 
+                ? "bg-red-600 text-white hover:bg-red-700" 
+                : "bg-gray-600 text-gray-300 opacity-50 cursor-not-allowed"
+            }`}
+          >
+            <Trash2 size={14} className="mr-1" />
+            <span>Eliminar</span>
           </button>
         </div>
         
@@ -560,6 +634,7 @@ const ClientList = () => {
             name="NOMBRE"
             id="search-nombre"
             icon={<Search size={14} className="text-gray-400" />}
+            className="text-white bg-slate-700 border-slate-600 placeholder-gray-400 focus:border-blue-500"
           />
         </div>
       </div>
@@ -655,6 +730,112 @@ const ClientList = () => {
               />
             </div>
           </div>
+          
+          {/* Sección de filtros por sectores y características */}
+          <div className="border-t border-gray-200 mt-2 pt-2">
+            <label className="block text-xs text-gray-700 mb-1">
+              Filtrar por Sectores y Características
+            </label>
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2">
+              <div className="flex items-center">
+                <input
+                  type="checkbox"
+                  id="filter-factura-determinaciones"
+                  name="FACTURA_DETERMINACIONES"
+                  checked={filters.FACTURA_DETERMINACIONES === '1'}
+                  onChange={handleFilterChange}
+                  className="h-3 w-3 mr-1"
+                />
+                <label htmlFor="filter-factura-determinaciones" className="text-xs text-gray-700">
+                  Factura por determinaciones
+                </label>
+              </div>
+              
+              <div className="flex items-center">
+                <input
+                  type="checkbox"
+                  id="filter-aeronautico"
+                  name="EADS"
+                  checked={filters.EADS === '1'}
+                  onChange={handleFilterChange}
+                  className="h-3 w-3 mr-1"
+                />
+                <label htmlFor="filter-aeronautico" className="text-xs text-gray-700">
+                  Aeronáutico
+                </label>
+              </div>
+              
+              <div className="flex items-center">
+                <input
+                  type="checkbox"
+                  id="filter-airbus"
+                  name="AIRBUS"
+                  checked={filters.AIRBUS === '1'}
+                  onChange={handleFilterChange}
+                  className="h-3 w-3 mr-1"
+                />
+                <label htmlFor="filter-airbus" className="text-xs text-gray-700">
+                  Airbus
+                </label>
+              </div>
+              
+              <div className="flex items-center">
+                <input
+                  type="checkbox"
+                  id="filter-iberia"
+                  name="IBERIA"
+                  checked={filters.IBERIA === '1'}
+                  onChange={handleFilterChange}
+                  className="h-3 w-3 mr-1"
+                />
+                <label htmlFor="filter-iberia" className="text-xs text-gray-700">
+                  Iberia
+                </label>
+              </div>
+              
+              <div className="flex items-center">
+                <input
+                  type="checkbox"
+                  id="filter-agroalimentario"
+                  name="AGROALIMENTARIO"
+                  checked={filters.AGROALIMENTARIO === '1'}
+                  onChange={handleFilterChange}
+                  className="h-3 w-3 mr-1"
+                />
+                <label htmlFor="filter-agroalimentario" className="text-xs text-gray-700">
+                  Agroalimentario
+                </label>
+              </div>
+              
+              <div className="flex items-center">
+                <input
+                  type="checkbox"
+                  id="filter-extranjero"
+                  name="EXTRANJERO"
+                  checked={filters.EXTRANJERO === '1'}
+                  onChange={handleFilterChange}
+                  className="h-3 w-3 mr-1"
+                />
+                <label htmlFor="filter-extranjero" className="text-xs text-gray-700">
+                  Extracomunitario
+                </label>
+              </div>
+              
+              <div className="flex items-center">
+                <input
+                  type="checkbox"
+                  id="filter-intra"
+                  name="INTRA"
+                  checked={filters.INTRA === '1'}
+                  onChange={handleFilterChange}
+                  className="h-3 w-3 mr-1"
+                />
+                <label htmlFor="filter-intra" className="text-xs text-gray-700">
+                  Intracomunitario
+                </label>
+              </div>
+            </div>
+          </div>
         </div>
       )}
       
@@ -666,38 +847,32 @@ const ClientList = () => {
         </div>
       )}
       
-      {/* Tabla de clientes */}
-      <div className="flex-grow">
-        <CustomizableTable
+      {/* Tabla de clientes (optimizada) */}
+      <div className="flex-grow min-h-0">
+        <ClientsTable
           ref={clientsTableRef}
           data={filteredClients}
-          columns={columns}
           isLoading={isLoading && filteredClients.length === 0}
           isLoadingMore={isLoadingMore}
-          onRowClick={(client) => {
-            setSelectedClient(client);
+          onRowDoubleClick={(client) => {
+            // Solo abrir modal de detalles en doble clic
             handleViewClient(client);
           }}
-          initialVisibleColumns={defaultVisibleColumns}
-          tableId="clients-table"
+          onRowSelect={(client) => {
+            setSelectedClient(client);
+          }}
           loadMoreData={loadMoreClients}
           hasMoreData={hasMore}
           emptyMessage={
-            filters.NOMBRE || filters.CIF || filters.TELEFONO || filters.EMAIL || filters.ANULADO 
+            filters.NOMBRE || filters.CIF || filters.TELEFONO || filters.EMAIL || filters.ANULADO || 
+            filters.FACTURA_DETERMINACIONES || filters.EADS || filters.AIRBUS || filters.IBERIA || 
+            filters.AGROALIMENTARIO || filters.EXTRANJERO || filters.INTRA
               ? "No hay clientes que coincidan con los filtros" 
               : "No hay clientes disponibles"
           }
         />
       </div>
       
-      {/* Barra de estado inferior con contador */}
-      <div className="bg-gray-50 border-t border-gray-200 px-3 py-1 text-xs text-gray-500">
-        {filteredClients.length} {filteredClients.length === 1 ? "cliente" : "clientes"} {
-          totalCount > filteredClients.length 
-            ? `(mostrando ${filteredClients.length} de ${totalCount} totales)` 
-            : ""
-        }
-      </div>
     </div>
   );
 };

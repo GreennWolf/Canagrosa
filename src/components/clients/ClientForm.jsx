@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Save, X, AlertCircle, ArrowLeft, RotateCw, Paperclip,
@@ -141,10 +141,11 @@ const FormSection = ({ title, children, className = '' }) => {
 const ClientForm = ({ 
   clientId, 
   isEdit = false,
+  isClone = false,
+  cloneData = null,
   onSuccess,
   onCancel 
 }) => {
-  const navigate = useNavigate();
   const { openModal, closeModal } = useModal();
   const { 
     data,
@@ -154,16 +155,13 @@ const ClientForm = ({
     fetchPaymentMethods,
     fetchRates,
     fetchClientsForCombo,
-    fetchUsers,
-    createOrUpdateResource
+    fetchUsers
   } = useData();
   
   // Estados principales
-  const [client, setClient] = useState(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
-  const [success, setSuccess] = useState(false);
   
   // Estado para formulario principal
   const [formData, setFormData] = useState({
@@ -273,11 +271,21 @@ const ClientForm = ({
               throw new Error('Formato de datos no esperado');
             }
             
-            setClient(clientInfo);
-            // Importante: usar la función de actualización para evitar problemas con cierres
+                // Importante: usar la función de actualización para evitar problemas con cierres
             setFormData(prev => ({
               ...prev,
-              ...clientInfo
+              ...clientInfo,
+              PAIS_ID: clientInfo.PAIS_ID || '',
+              PROVINCIA_ID: clientInfo.PROVINCIA_ID || '',
+              MUNICIPIO_ID: clientInfo.MUNICIPIO_ID || '',
+              PAIS_ID_ENVIO: clientInfo.PAIS_ID_ENVIO || '',
+              PROVINCIA_ID_ENVIO: clientInfo.PROVINCIA_ID_ENVIO || '',
+              MUNICIPIO_ID_ENVIO: clientInfo.MUNICIPIO_ID_ENVIO || '',
+              PAIS_ID_FACTURACION: clientInfo.PAIS_ID_FACTURACION || '',
+              PROVINCIA_ID_FACTURACION: clientInfo.PROVINCIA_ID_FACTURACION || '',
+              MUNICIPIO_ID_FACTURACION: clientInfo.MUNICIPIO_ID_FACTURACION || '',
+              FP_ID: clientInfo.FP_ID || '',
+              TARIFA_ID: clientInfo.TARIFA_ID || ''
             }));
             
             // Si tiene responsables, cargarlos
@@ -298,11 +306,59 @@ const ClientForm = ({
       fetchClient();
     }
   }, [clientId, isEdit]);
+
+  // Cargar datos para clonación
+  useEffect(() => {
+    if (isClone && cloneData) {
+      setLoading(true);
+      try {
+        // Usar los datos del cliente a clonar
+        const clientInfo = cloneData;
+        
+        // Preparar datos para clonación (sin ID y con nombre modificado)
+        setFormData(prev => ({
+          ...prev,
+          ...clientInfo,
+          ID_CLIENTE: null, // Remover ID para crear nuevo cliente
+          NOMBRE: `${clientInfo.NOMBRE} (duplicado)`, // Modificar nombre
+          CIF: '', // Limpiar CIF (debe ser único)
+          PAIS_ID: clientInfo.PAIS_ID || '',
+          PROVINCIA_ID: clientInfo.PROVINCIA_ID || '',
+          MUNICIPIO_ID: clientInfo.MUNICIPIO_ID || '',
+          PAIS_ID_ENVIO: clientInfo.PAIS_ID_ENVIO || '',
+          PROVINCIA_ID_ENVIO: clientInfo.PROVINCIA_ID_ENVIO || '',
+          MUNICIPIO_ID_ENVIO: clientInfo.MUNICIPIO_ID_ENVIO || '',
+          PAIS_ID_FACTURACION: clientInfo.PAIS_ID_FACTURACION || '',
+          PROVINCIA_ID_FACTURACION: clientInfo.PROVINCIA_ID_FACTURACION || '',
+          MUNICIPIO_ID_FACTURACION: clientInfo.MUNICIPIO_ID_FACTURACION || '',
+          FP_ID: clientInfo.FP_ID || '',
+          TARIFA_ID: clientInfo.TARIFA_ID || ''
+        }));
+        
+        // Si tiene responsables, cargarlos
+        if (clientInfo.responsables && Array.isArray(clientInfo.responsables)) {
+          setResponsibles(clientInfo.responsables);
+        }
+      } catch (err) {
+        console.error('Error loading clone data:', err);
+        setError('Error al cargar los datos para clonación');
+      } finally {
+        setLoading(false);
+      }
+    }
+  }, [isClone, cloneData]);
   
   // Cargar provincias cuando cambia el país
   useEffect(() => {
     if (formData.PAIS_ID) {
       fetchProvinces({ PAIS_ID: formData.PAIS_ID });
+    } else {
+      // Reset provincias y municipios si no hay país
+      setFormData(prev => ({
+        ...prev,
+        PROVINCIA_ID: '',
+        MUNICIPIO_ID: ''
+      }));
     }
   }, [formData.PAIS_ID, fetchProvinces]);
   
@@ -310,6 +366,12 @@ const ClientForm = ({
   useEffect(() => {
     if (formData.PROVINCIA_ID) {
       fetchMunicipalities({ PROVINCIA_ID: formData.PROVINCIA_ID });
+    } else {
+      // Reset municipios si no hay provincia
+      setFormData(prev => ({
+        ...prev,
+        MUNICIPIO_ID: ''
+      }));
     }
   }, [formData.PROVINCIA_ID, fetchMunicipalities]);
   
@@ -317,6 +379,12 @@ const ClientForm = ({
   useEffect(() => {
     if (formData.PAIS_ID_ENVIO) {
       fetchProvinces({ PAIS_ID: formData.PAIS_ID_ENVIO });
+    } else {
+      setFormData(prev => ({
+        ...prev,
+        PROVINCIA_ID_ENVIO: '',
+        MUNICIPIO_ID_ENVIO: ''
+      }));
     }
   }, [formData.PAIS_ID_ENVIO, fetchProvinces]);
   
@@ -324,6 +392,11 @@ const ClientForm = ({
   useEffect(() => {
     if (formData.PROVINCIA_ID_ENVIO) {
       fetchMunicipalities({ PROVINCIA_ID: formData.PROVINCIA_ID_ENVIO });
+    } else {
+      setFormData(prev => ({
+        ...prev,
+        MUNICIPIO_ID_ENVIO: ''
+      }));
     }
   }, [formData.PROVINCIA_ID_ENVIO, fetchMunicipalities]);
   
@@ -331,6 +404,12 @@ const ClientForm = ({
   useEffect(() => {
     if (formData.PAIS_ID_FACTURACION) {
       fetchProvinces({ PAIS_ID: formData.PAIS_ID_FACTURACION });
+    } else {
+      setFormData(prev => ({
+        ...prev,
+        PROVINCIA_ID_FACTURACION: '',
+        MUNICIPIO_ID_FACTURACION: ''
+      }));
     }
   }, [formData.PAIS_ID_FACTURACION, fetchProvinces]);
   
@@ -338,46 +417,51 @@ const ClientForm = ({
   useEffect(() => {
     if (formData.PROVINCIA_ID_FACTURACION) {
       fetchMunicipalities({ PROVINCIA_ID: formData.PROVINCIA_ID_FACTURACION });
+    } else {
+      setFormData(prev => ({
+        ...prev,
+        MUNICIPIO_ID_FACTURACION: ''
+      }));
     }
   }, [formData.PROVINCIA_ID_FACTURACION, fetchMunicipalities]);
   
   // Preparar opciones para los selectores
-  const countryOptions = data.countries.map(country => ({
+  const countryOptions = data.countries?.map(country => ({
     value: country.ID_PAIS,
     label: country.NOMBRE
-  }));
+  })) || [];
   
-  const provinceOptions = data.provinces.map(province => ({
+  const provinceOptions = data.provinces?.map(province => ({
     value: province.ID_PROVINCIA,
     label: province.NOMBRE
-  }));
+  })) || [];
   
-  const municipalityOptions = data.municipalities.map(municipality => ({
+  const municipalityOptions = data.municipalities?.map(municipality => ({
     value: municipality.ID_MUNICIPIO,
     label: municipality.NOMBRE
-  }));
+  })) || [];
   
-  const paymentMethodOptions = data.paymentMethods.map(method => ({
+  const paymentMethodOptions = data.paymentMethods?.map(method => ({
     value: method.ID_FP,
     label: method.NOMBRE
-  }));
+  })) || [];
   
-  const rateOptions = data.rates.map(rate => ({
+  const rateOptions = data.rates?.map(rate => ({
     value: rate.ID_TARIFA,
     label: rate.NOMBRE
-  }));
+  })) || [];
   
-  const clientOptions = data.clients.map(client => ({
+  const clientOptions = data.clients?.map(client => ({
     value: client.ID_CLIENTE,
     label: client.NOMBRE
-  }));
+  })) || [];
   
   const userOptions = data.users
-    .filter(user => user.ANULADO !== 1)
-    .map(user => ({
+    ?.filter(user => user.ANULADO !== 1)
+    ?.map(user => ({
       value: user.ID_EMPLEADO,
       label: `${user.NOMBRE} ${user.APELLIDOS || ''}`.trim()
-    }));
+    })) || [];
   
   // Manejar cambios en campos de texto e inputs
   const handleChange = (e) => {
@@ -416,7 +500,7 @@ const ClientForm = ({
   const handleAddResponsible = () => {
     if (!selectedResponsible) return;
     
-    const selectedUser = data.users.find(user => 
+    const selectedUser = data.users?.find(user => 
       user.ID_EMPLEADO === parseInt(selectedResponsible)
     );
     
@@ -508,22 +592,36 @@ const ClientForm = ({
     setError(null);
     
     try {
-      // Preparar data para envío incluyendo los responsables
+      // Preparar data para envío
       const dataToSend = {
         ...formData,
+        // Convertir cadenas vacías a null/0 para los selects
+        PAIS_ID: formData.PAIS_ID || null,
+        PROVINCIA_ID: formData.PROVINCIA_ID || null,
+        MUNICIPIO_ID: formData.MUNICIPIO_ID || null,
+        PAIS_ID_ENVIO: formData.PAIS_ID_ENVIO || null,
+        PROVINCIA_ID_ENVIO: formData.PROVINCIA_ID_ENVIO || null,
+        MUNICIPIO_ID_ENVIO: formData.MUNICIPIO_ID_ENVIO || null,
+        PAIS_ID_FACTURACION: formData.PAIS_ID_FACTURACION || null,
+        PROVINCIA_ID_FACTURACION: formData.PROVINCIA_ID_FACTURACION || null,
+        MUNICIPIO_ID_FACTURACION: formData.MUNICIPIO_ID_FACTURACION || null,
+        FP_ID: formData.FP_ID || null,
+        TARIFA_ID: formData.TARIFA_ID || null,
+        PARENT_ID: formData.PARENT_ID || null,
+        // Agregar responsables
         responsables: responsibles.map(resp => resp.ID_EMPLEADO)
       };
       
       let result;
       
-      // Utilizar los servicios apropiados según sea edición o creación
+      // Utilizar los servicios apropiados según sea edición, clonación o creación
       if (isEdit) {
         result = await clientesService.actualizar(dataToSend);
       } else {
+        // Para clonación y creación usar el mismo endpoint de crear
         result = await clientesService.crear(dataToSend);
       }
       
-      setSuccess(true);
       
       // Mostrar mensaje de éxito
       openModal('successModal', {
@@ -534,7 +632,7 @@ const ClientForm = ({
             <Modal.Body>
               <div className="flex items-center text-green-600">
                 <Check className="h-6 w-6 mr-2" />
-                <p className="font-medium">{isEdit ? 'Cliente actualizado correctamente' : 'Cliente creado correctamente'}</p>
+                <p className="font-medium">{isEdit ? 'Cliente actualizado correctamente' : (isClone ? 'Cliente clonado correctamente' : 'Cliente creado correctamente')}</p>
               </div>
             </Modal.Body>
             <Modal.Footer>
@@ -557,8 +655,8 @@ const ClientForm = ({
     } catch (err) {
       console.error('Error saving client:', err);
       setError(
-        err.message || 
-        `Error al ${isEdit ? 'actualizar' : 'crear'} el cliente. Por favor, intente nuevamente.`
+        err.response?.data?.msg || err.message || 
+        `Error al ${isEdit ? 'actualizar' : (isClone ? 'clonar' : 'crear')} el cliente. Por favor, intente nuevamente.`
       );
     } finally {
       setSaving(false);
@@ -595,7 +693,7 @@ const ClientForm = ({
       <Modal.Header>
         <div className="flex items-center">
           <Building size={18} className="mr-2" />
-          <span>{isEdit ? 'Editar Cliente' : 'Nuevo Cliente'}</span>
+          <span>{isEdit ? 'Editar Cliente' : (isClone ? 'Clonar Cliente' : 'Nuevo Cliente')}</span>
           {isEdit && clientId && <span className="text-sm ml-2 opacity-75">(#{clientId})</span>}
         </div>
       </Modal.Header>
@@ -1391,4 +1489,5 @@ const ClientForm = ({
   );
 };
 
-export default ClientForm;
+// Wrap con React.memo para prevenir re-renderizados innecesarios
+export default React.memo(ClientForm);

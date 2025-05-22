@@ -19,6 +19,10 @@ clienteApi.interceptors.request.use(
     if (token) {
       config.headers['Authorization'] = `Bearer ${token}`;
     }
+    
+    // Asegurarnos de que cada petición tenga un identificador único para rastreo
+    config.requestId = Date.now().toString(36) + Math.random().toString(36).substr(2);
+    
     return config;
   },
   (error) => Promise.reject(error)

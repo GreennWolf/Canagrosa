@@ -1,69 +1,57 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Search, Check, ChevronDown, X } from 'lucide-react';
 
-const SelectInput = React.memo(({
-  options = [],
-  value,
-  onChange,
-  placeholder = 'Seleccionar...',
-  name,
-  id,
-  className = '',
-  disabled = false,
-  error = null,
-  allowClear = true,
-  icon = <Search size={12} className="text-gray-400" />,
-  maxDisplayItems = 100
-}) => {
+const SelectInput = (props) => {
+  const {
+    options = [],
+    value,
+    onChange,
+    placeholder = 'Seleccionar...',
+    name,
+    id,
+    className = '',
+    disabled = false,
+    error = null,
+    allowClear = true,
+    icon = <Search size={12} className="text-gray-400" />,
+    maxDisplayItems = 100
+  } = props;
+
   const [searchText, setSearchText] = useState('');
   const [showDropdown, setShowDropdown] = useState(false);
   const [highlightedIndex, setHighlightedIndex] = useState(-1);
-  const [visibleOptions, setVisibleOptions] = useState([]);
+  const [filteredOptions, setFilteredOptions] = useState([]);
   const inputRef = useRef(null);
   const dropdownRef = useRef(null);
-  const optionsRef = useRef(options);
-  
-  // Actualizar la referencia cuando cambian las opciones
-  useEffect(() => {
-    optionsRef.current = options;
-  }, [options]);
 
-  // Inicializar opciones visibles y actualizar cuando cambia searchText
+  // Filtrar opciones cuando cambia el texto de búsqueda o las opciones
   useEffect(() => {
-    const filterOptions = () => {
-      let results;
-      const currentOptions = optionsRef.current;
-      
-      if (searchText.trim() === '') {
-        results = currentOptions.slice(0, maxDisplayItems);
-      } else {
-        results = currentOptions
-          .filter(option => 
-            option.label.toLowerCase().includes(searchText.toLowerCase())
-          )
-          .slice(0, maxDisplayItems);
-      }
-      
-      setVisibleOptions(results);
-      setHighlightedIndex(-1);
-    };
-    
-    filterOptions();
-  }, [searchText, maxDisplayItems]);
+    let results;
+    if (!searchText.trim()) {
+      results = options.slice(0, maxDisplayItems);
+    } else {
+      const searchLower = searchText.toLowerCase();
+      results = options
+        .filter(option => option.label.toLowerCase().includes(searchLower))
+        .slice(0, maxDisplayItems);
+    }
+    setFilteredOptions(results);
+    setHighlightedIndex(-1);
+  }, [searchText, options, maxDisplayItems]);
 
-  // Actualizar searchText cuando cambia el valor seleccionado
+  // Actualizar texto de búsqueda cuando cambia el valor seleccionado
   useEffect(() => {
     if (value) {
-      const selectedOption = optionsRef.current.find(opt => opt.value === value);
-      if (selectedOption) {
-        setSearchText(selectedOption.label);
+      const selected = options.find(opt => opt.value === value);
+      if (selected) {
+        setSearchText(selected.label);
       }
     } else {
       setSearchText('');
     }
-  }, [value]);
+  }, [value, options]);
 
-  // Manejar clic fuera para cerrar dropdown
+  // Cerrar dropdown cuando se hace clic fuera
   useEffect(() => {
     const handleClickOutside = (e) => {
       if (
@@ -75,28 +63,26 @@ const SelectInput = React.memo(({
         setShowDropdown(false);
       }
     };
-
+    
     document.addEventListener('mousedown', handleClickOutside);
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, []);
 
-  // Scroll al elemento destacado
+  // Scroll para el elemento destacado
   useEffect(() => {
     if (highlightedIndex >= 0 && dropdownRef.current) {
       const highlighted = dropdownRef.current.querySelector(`[data-index="${highlightedIndex}"]`);
       if (highlighted) {
         highlighted.scrollIntoView({
-          block: 'nearest',
-          inline: 'nearest',
-          behavior: 'auto'
+          block: 'nearest', 
+          behavior: 'smooth'
         });
       }
     }
   }, [highlightedIndex]);
 
-  // Handlers para eventos de usuario
   const handleInputChange = (e) => {
     setSearchText(e.target.value);
     setShowDropdown(true);
@@ -106,7 +92,6 @@ const SelectInput = React.memo(({
     onChange({ target: { name, value: option.value } });
     setSearchText(option.label);
     setShowDropdown(false);
-    inputRef.current?.focus();
   };
 
   const handleInputFocus = () => {
@@ -132,7 +117,7 @@ const SelectInput = React.memo(({
       case 'ArrowDown':
         e.preventDefault();
         setHighlightedIndex(prev => 
-          prev < visibleOptions.length - 1 ? prev + 1 : prev
+          prev < filteredOptions.length - 1 ? prev + 1 : prev
         );
         break;
       case 'ArrowUp':
@@ -141,8 +126,8 @@ const SelectInput = React.memo(({
         break;
       case 'Enter':
         e.preventDefault();
-        if (highlightedIndex >= 0 && highlightedIndex < visibleOptions.length) {
-          handleOptionSelect(visibleOptions[highlightedIndex]);
+        if (highlightedIndex >= 0 && highlightedIndex < filteredOptions.length) {
+          handleOptionSelect(filteredOptions[highlightedIndex]);
         }
         break;
       case 'Escape':
@@ -153,6 +138,12 @@ const SelectInput = React.memo(({
         break;
     }
   };
+
+  // Determinar si necesitamos texto blanco o negro basado en el color de fondo
+  const isDarkBackground = className.includes('bg-slate-800') || 
+                          className.includes('bg-slate-700') || 
+                          className.includes('bg-slate-900') || 
+                          className.includes('bg-black');
 
   return (
     <div className={`relative ${className}`}>
@@ -172,10 +163,10 @@ const SelectInput = React.memo(({
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
           disabled={disabled}
-          className={`w-full pl-7 pr-8 py-1 text-xs border ${
+          className={`w-full pl-7 pr-8 py-1 text-xs border rounded-md shadow-sm focus:outline-none ${
             error ? 'border-red-300' : 'border-gray-300'
-          } rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 ${
-            disabled ? 'bg-gray-100' : ''
+          } ${disabled ? 'bg-gray-100' : ''} ${
+            isDarkBackground ? 'text-white placeholder-gray-400 focus:border-blue-500 focus:text-white' : 'text-gray-800 placeholder-gray-500'
           }`}
           autoComplete="off"
         />
@@ -185,14 +176,14 @@ const SelectInput = React.memo(({
             <button
               type="button"
               onClick={handleClear}
-              className="text-gray-400 hover:text-gray-600 focus:outline-none p-1"
+              className={`${isDarkBackground ? 'text-gray-400 hover:text-white' : 'text-gray-400 hover:text-gray-600'} focus:outline-none p-1`}
             >
               <X size={12} />
             </button>
           )}
           <button
             type="button"
-            className="text-gray-400 focus:outline-none p-1"
+            className={`${isDarkBackground ? 'text-gray-400 hover:text-white' : 'text-gray-400'} focus:outline-none p-1`}
             onClick={() => setShowDropdown(!showDropdown)}
           >
             <ChevronDown size={12} className={`transform ${showDropdown ? 'rotate-180' : ''} transition-transform`} />
@@ -205,9 +196,9 @@ const SelectInput = React.memo(({
           ref={dropdownRef}
           className="absolute z-50 mt-1 w-full bg-white shadow-lg max-h-48 rounded-md overflow-auto focus:outline-none border border-gray-200"
         >
-          {visibleOptions.length > 0 ? (
+          {filteredOptions.length > 0 ? (
             <ul className="py-1">
-              {visibleOptions.map((option, index) => (
+              {filteredOptions.map((option, index) => (
                 <li
                   key={`${option.value}-${index}`}
                   data-index={index}
@@ -216,18 +207,18 @@ const SelectInput = React.memo(({
                     index === highlightedIndex 
                       ? 'bg-blue-100 text-blue-900'
                       : option.value === value
-                        ? 'bg-gray-100 text-gray-900'
-                        : 'hover:bg-gray-50'
+                        ? 'bg-blue-500 text-white'
+                        : 'hover:bg-gray-50 text-gray-800'
                   }`}
                 >
                   <span className="truncate">{option.label}</span>
-                  {option.value === value && <Check size={12} className="text-blue-600 ml-1 flex-shrink-0" />}
+                  {option.value === value && <Check size={12} className={option.value === value ? 'text-white ml-1 flex-shrink-0' : 'text-blue-600 ml-1 flex-shrink-0'} />}
                 </li>
               ))}
               
-              {options.length > maxDisplayItems && visibleOptions.length < options.length && (
+              {options.length > maxDisplayItems && filteredOptions.length < options.length && (
                 <li className="px-2 py-1 text-xs text-gray-500 text-center bg-gray-50">
-                  {visibleOptions.length} de {options.length}
+                  {filteredOptions.length} de {options.length}
                 </li>
               )}
             </ul>
@@ -242,8 +233,6 @@ const SelectInput = React.memo(({
       )}
     </div>
   );
-});
-
-SelectInput.displayName = 'SelectInput';
+};
 
 export default SelectInput;

@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { 
   Search, 
   Filter, 
@@ -12,21 +11,22 @@ import {
   ShieldCheck,
   ShieldAlert,
   Eye,
-  Pencil,
-  Trash,
   User,
-  Lock,
   ListFilter,
-  Plus
+  Plus,
+  Edit,
+  Copy,
+  Trash2
 } from 'lucide-react';
 import CustomizableTable from '../../components/common/CustomizableTable';
 import SelectInput from '../../components/common/SelectInput';
 import { useModal } from '../../contexts/ModalContext';
+import ConfirmDialog from '../../components/common/ConfirmDialog';
 import usuariosService from '../../services/usuariosService';
-import ThemeConstants from '../../constants/ThemeConstants';
+import UserDetail from '../../components/users/UserDetail';
+import UserForm from '../../components/users/UserForm';
 
 const UsersList = () => {
-  const navigate = useNavigate();
   const usersTableRef = useRef(null);
   
   // Estado para la lista y filtrado de usuarios
@@ -58,6 +58,9 @@ const UsersList = () => {
   
   // Obtener funciones del contexto de modales
   const { openModal, closeModal } = useModal();
+  
+  // Estado para el proceso de eliminación
+  const [isDeleting, setIsDeleting] = useState(false);
   
   // Función para cargar usuarios (primera página)
   const fetchUsers = useCallback(async (forceRefresh = false) => {
@@ -112,7 +115,7 @@ const UsersList = () => {
     } finally {
       setIsLoadingMore(false);
     }
-  }, [filters, page, hasMore, isLoadingMore]);
+  }, [hasMore, isLoadingMore]);
   
   // Actualizar opciones para los filtros
   const updateFilterOptions = useCallback((usersData) => {
@@ -188,100 +191,212 @@ const UsersList = () => {
     setFilteredUsers(users);
   };
   
-  // Ver detalles del usuario
-  const handleViewUser = (user) => {
-    if (!user) return;
-    
-    openModal('viewUser', {
-      title: `${user.NOMBRE || ''} ${user.APELLIDOS || ''}`.trim(),
-      size: 'md',
+  // Abrir modal para crear usuario
+  const handleOpenCreateModal = () => {
+    openModal('createUser', {
+      title: 'Nuevo Usuario',
+      size: '2xl',
       content: (
-        <div className="p-4">
-          <div className="flex flex-col items-center mb-6">
-            <div className="w-20 h-20 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 mb-3">
-              <UserCircle size={48} />
-            </div>
-            <h2 className="text-xl font-semibold text-center">{`${user.NOMBRE || ''} ${user.APELLIDOS || ''}`.trim()}</h2>
-            <div className="text-sm text-gray-500 mt-1 flex items-center">
-              <User size={14} className="mr-1" />
-              {user.USUARIO || 'Sin usuario'}
-            </div>
-            {user.EMAIL && (
-              <div className="text-sm text-gray-500 mt-1 flex items-center">
-                <Mail size={14} className="mr-1" />
-                {user.EMAIL}
-              </div>
-            )}
-            <div className="mt-3">
-              {user.ANULADO === 1 ? (
-                <span className="bg-red-100 text-red-800 text-xs px-2 py-1 rounded-full">
-                  Anulado
-                </span>
-              ) : (
-                <span className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full">
-                  Activo
-                </span>
-              )}
-            </div>
-          </div>
-          
-          <h3 className="text-sm font-medium mb-2 border-b pb-1">Permisos</h3>
-          <div className="grid grid-cols-2 gap-2 mb-4">
-            <div className="flex items-center">
-              <div className={`w-4 h-4 rounded-sm mr-2 flex items-center justify-center ${user.PER_IMPRESION ? 'bg-green-500' : 'bg-gray-200'}`}>
-                {user.PER_IMPRESION ? <CheckCircle size={12} className="text-white" /> : null}
-              </div>
-              <span className="text-sm">Impresión</span>
-            </div>
-            <div className="flex items-center">
-              <div className={`w-4 h-4 rounded-sm mr-2 flex items-center justify-center ${user.PER_FACTURACION ? 'bg-green-500' : 'bg-gray-200'}`}>
-                {user.PER_FACTURACION ? <CheckCircle size={12} className="text-white" /> : null}
-              </div>
-              <span className="text-sm">Facturación</span>
-            </div>
-            <div className="flex items-center">
-              <div className={`w-4 h-4 rounded-sm mr-2 flex items-center justify-center ${user.PER_MODIFICACION ? 'bg-green-500' : 'bg-gray-200'}`}>
-                {user.PER_MODIFICACION ? <CheckCircle size={12} className="text-white" /> : null}
-              </div>
-              <span className="text-sm">Modificación</span>
-            </div>
-            <div className="flex items-center">
-              <div className={`w-4 h-4 rounded-sm mr-2 flex items-center justify-center ${user.PER_ELIMINACION ? 'bg-green-500' : 'bg-gray-200'}`}>
-                {user.PER_ELIMINACION ? <CheckCircle size={12} className="text-white" /> : null}
-              </div>
-              <span className="text-sm">Eliminación</span>
-            </div>
-            <div className="flex items-center">
-              <div className={`w-4 h-4 rounded-sm mr-2 flex items-center justify-center ${user.PER_USUARIOS ? 'bg-green-500' : 'bg-gray-200'}`}>
-                {user.PER_USUARIOS ? <CheckCircle size={12} className="text-white" /> : null}
-              </div>
-              <span className="text-sm">Usuarios</span>
-            </div>
-            <div className="flex items-center">
-              <div className={`w-4 h-4 rounded-sm mr-2 flex items-center justify-center ${user.PER_EDICION ? 'bg-green-500' : 'bg-gray-200'}`}>
-                {user.PER_EDICION ? <CheckCircle size={12} className="text-white" /> : null}
-              </div>
-              <span className="text-sm">Edición</span>
-            </div>
-            <div className="flex items-center">
-              <div className={`w-4 h-4 rounded-sm mr-2 flex items-center justify-center ${user.PER_CIERRE ? 'bg-green-500' : 'bg-gray-200'}`}>
-                {user.PER_CIERRE ? <CheckCircle size={12} className="text-white" /> : null}
-              </div>
-              <span className="text-sm">Cierre</span>
-            </div>
-          </div>
-          
-          <div className="flex justify-end mt-4">
-            <button
-              onClick={() => closeModal('viewUser')}
-              className="px-3 py-1.5 bg-blue-600 rounded text-white hover:bg-blue-700 text-sm"
-            >
-              Cerrar
-            </button>
-          </div>
-        </div>
+        <UserForm 
+          onSuccess={() => {
+            closeModal('createUser');
+            fetchUsers(true);
+          }}
+          onCancel={() => closeModal('createUser')}
+        />
       )
     });
+  };
+  
+  // Abrir modal para editar usuario
+  const handleOpenEditModal = (user) => {
+    if (!user) return;
+    
+    const userName = `${user.NOMBRE || ''} ${user.APELLIDOS || ''}`.trim();
+    
+    openModal('editUser', {
+      title: `Editar Usuario: ${userName}`,
+      size: '2xl',
+      content: (
+        <UserForm 
+          userId={user.ID_EMPLEADO}
+          isEdit={true}
+          onSuccess={() => {
+            closeModal('editUser');
+            fetchUsers(true);
+          }}
+          onCancel={() => closeModal('editUser')}
+        />
+      )
+    });
+  };
+  
+  // Abrir modal para clonar usuario
+  const handleOpenCloneModal = (user) => {
+    if (!user) return;
+    
+    const userName = `${user.NOMBRE || ''} ${user.APELLIDOS || ''}`.trim();
+    
+    openModal('cloneUser', {
+      title: `Clonar Usuario: ${userName}`,
+      size: '2xl',
+      content: (
+        <UserForm 
+          isClone={true}
+          cloneData={user}
+          onSuccess={() => {
+            closeModal('cloneUser');
+            fetchUsers(true);
+          }}
+          onCancel={() => closeModal('cloneUser')}
+        />
+      )
+    });
+  };
+  
+  // Abrir modal para ver detalles del usuario
+  const handleViewUser = (user) => {
+    const userName = `${user.NOMBRE || ''} ${user.APELLIDOS || ''}`.trim();
+    
+    openModal('viewUser', {
+      title: userName,
+      size: '2xl',
+      content: (
+        <UserDetail 
+          userId={user.ID_EMPLEADO} 
+          onEdit={() => {
+            closeModal('viewUser');
+            handleOpenEditModal(user);
+          }}
+          onClose={() => closeModal('viewUser')}
+          onDelete={() => {
+            closeModal('viewUser');
+            handleOpenDeleteConfirmation(user);
+          }}
+          onClone={() => {
+            closeModal('viewUser');
+            handleOpenCloneModal(user);
+          }}
+        />
+      )
+    });
+  };
+  
+  // Abrir modal de confirmación para eliminar usuario
+  const handleOpenDeleteConfirmation = (user) => {
+    const userName = `${user.NOMBRE || ''} ${user.APELLIDOS || ''}`.trim();
+    
+    openModal('deleteUser', {
+      title: 'Confirmar eliminación',
+      size: 'sm',
+      content: (
+        <ConfirmDialog
+          title="Confirmar eliminación"
+          message="¿Está seguro de eliminar este usuario? Esta acción no se puede deshacer."
+          type="danger"
+          confirmLabel="Eliminar"
+          cancelLabel="Cancelar"
+          isProcessing={isDeleting}
+          additionalContent={
+            <div className="p-2 mt-2 bg-gray-100 rounded-md border border-gray-200">
+              <p className="font-medium text-gray-800">{userName}</p>
+              {user.USUARIO && <p className="text-sm text-gray-600">Usuario: {user.USUARIO}</p>}
+              {user.EMAIL && <p className="text-sm text-gray-600">Email: {user.EMAIL}</p>}
+              <div className="mt-1 flex items-center">
+                <User size={12} className="mr-1 text-gray-500" />
+                <span className="text-sm text-gray-600">
+                  {user.PER_USUARIOS === 1 && user.PER_ELIMINACION === 1 && user.PER_MODIFICACION === 1
+                    ? 'Administrador'
+                    : user.PER_MODIFICACION === 1
+                    ? 'Editor'
+                    : 'Usuario'}
+                </span>
+              </div>
+            </div>
+          }
+          onConfirm={async () => {
+            setIsDeleting(true);
+            try {
+              await handleDeleteUser(user);
+            } finally {
+              setIsDeleting(false);
+            }
+          }}
+          onCancel={() => {
+            closeModal('deleteUser');
+          }}
+        />
+      )
+    });
+  };
+  
+  // Eliminar usuario
+  const handleDeleteUser = async (user) => {
+    try {
+      await usuariosService.eliminar(user.ID_EMPLEADO);
+      closeModal('deleteUser');
+      
+      // Mostrar mensaje de éxito brevemente
+      openModal('successDelete', {
+        title: 'Usuario eliminado',
+        size: 'sm',
+        showCloseButton: false,
+        content: (
+          <div className="p-4 text-center">
+            <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-green-100 flex items-center justify-center">
+              <CheckCircle className="text-green-500" size={24} />
+            </div>
+            <p className="text-gray-800">El usuario ha sido eliminado correctamente.</p>
+          </div>
+        )
+      });
+      
+      // Cerrar el mensaje después de un tiempo y actualizar la lista
+      setTimeout(() => {
+        closeModal('successDelete');
+        if (usersTableRef.current) {
+          usersTableRef.current.setSelectedRow(null); // Limpiar la selección de la tabla
+        }
+        fetchUsers(true); // Actualizar la lista completa
+      }, 1500);
+      
+      return true; // Indicar éxito para el flujo de confirmación
+    } catch (error) {
+      console.error('Error deleting user:', error);
+      
+      // Mostrar mensaje de error
+      openModal('errorDelete', {
+        title: 'Error al eliminar',
+        size: 'sm',
+        content: (
+          <div className="p-4">
+            <div className="flex items-start">
+              <div className="w-10 h-10 flex-shrink-0 mr-3 rounded-full bg-red-100 flex items-center justify-center">
+                <AlertCircle className="text-red-500" size={20} />
+              </div>
+              <div>
+                <p className="text-gray-800 font-medium">No se pudo eliminar el usuario</p>
+                <p className="text-gray-600 mt-1">
+                  {error.isFormatted 
+                    ? error.message 
+                    : 'Ha ocurrido un error inesperado. Inténtelo de nuevo más tarde.'}
+                </p>
+              </div>
+            </div>
+            <div className="flex justify-end mt-4">
+              <button
+                onClick={() => closeModal('errorDelete')}
+                className="px-3 py-1.5 bg-blue-600 rounded text-white hover:bg-blue-700 text-sm"
+              >
+                Aceptar
+              </button>
+            </div>
+          </div>
+        )
+      });
+      
+      throw error; // Re-throw para manejar en el nivel superior si es necesario
+    }
   };
   
   // Definición de columnas para la tabla
@@ -399,7 +514,7 @@ const UsersList = () => {
       accessor: 'actions',
       header: 'Acciones',
       render: (row) => (
-        <div className="flex items-center space-x-2 justify-end">
+        <div className="flex items-center space-x-1 justify-end">
           <button 
             onClick={(e) => {
               e.stopPropagation();
@@ -410,15 +525,45 @@ const UsersList = () => {
           >
             <Eye size={14} />
           </button>
+          <button 
+            onClick={(e) => {
+              e.stopPropagation();
+              handleOpenEditModal(row);
+            }}
+            className="p-1 text-green-600 hover:text-green-800 rounded-full hover:bg-green-100"
+            title="Editar"
+          >
+            <Edit size={14} />
+          </button>
+          <button 
+            onClick={(e) => {
+              e.stopPropagation();
+              handleOpenCloneModal(row);
+            }}
+            className="p-1 text-purple-600 hover:text-purple-800 rounded-full hover:bg-purple-100"
+            title="Clonar"
+          >
+            <Copy size={14} />
+          </button>
+          <button 
+            onClick={(e) => {
+              e.stopPropagation();
+              handleOpenDeleteConfirmation(row);
+            }}
+            className="p-1 text-red-600 hover:text-red-800 rounded-full hover:bg-red-100"
+            title="Eliminar"
+          >
+            <Trash2 size={14} />
+          </button>
         </div>
       ),
-      width: 'w-20'
+      width: 'w-32'
     }
   ];
   
   // Columnas visibles por defecto
   const defaultVisibleColumns = [
-    'ID_EMPLEADO', 'NOMBRE', 'APELLIDOS', 'USUARIO', 'EMAIL', 'permission_summary', 'ANULADO', 'actions'
+    'ID_EMPLEADO', 'NOMBRE', 'APELLIDOS', 'USUARIO', 'EMAIL', 'permission_summary', 'role', 'ANULADO', 'actions'
   ];
 
   // Opciones para los filtros
@@ -449,6 +594,15 @@ const UsersList = () => {
           >
             <RefreshCw size={14} />
             <span className="hidden sm:inline ml-1">Actualizar</span>
+          </button>
+          
+          <button
+            onClick={handleOpenCreateModal}
+            className="flex items-center px-2 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700"
+            title="Nuevo usuario"
+          >
+            <Plus size={14} />
+            <span className="hidden sm:inline ml-1">Nuevo</span>
           </button>
         </div>
         

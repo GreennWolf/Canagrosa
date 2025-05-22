@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import clientesService from '../services/clientesService';
 import muestrasService from '../services/muestrasService';
 import usuariosService from '../services/usuariosService';
@@ -28,9 +28,13 @@ export const useData = () => {
 // Tiempo de caducidad del caché en milisegundos (5 minutos)
 const CACHE_EXPIRY = 5 * 60 * 1000;
 
+// Versión del caché para invalidación forzada
+const CACHE_VERSION = 1;
+
 export const DataProvider = ({ children }) => {
   // Estado para almacenar todas las entidades en caché
   const [dataCache, setDataCache] = useState({
+    cacheVersion: CACHE_VERSION,
     clients: { data: [], timestamp: null, loading: false, error: null },
     samples: { data: [], timestamp: null, loading: false, error: null },
     users: { data: [], timestamp: null, loading: false, error: null },
@@ -48,24 +52,57 @@ export const DataProvider = ({ children }) => {
     rates: { data: [], timestamp: null, loading: false, error: null }
   });
 
+  // Referencias para controlar solicitudes pendientes
+  const pendingRequests = useRef({});
+  
+  // Ref para acceder al cache actual sin dependencias
+  const dataCacheRef = useRef(dataCache);
+  
+  // Actualizar ref cuando cambie el cache
+  useEffect(() => {
+    dataCacheRef.current = dataCache;
+  }, [dataCache]);
+  
   // Función para verificar si los datos en caché están frescos
   const isCacheFresh = useCallback((entityName) => {
     const entity = dataCache[entityName];
     return (
       entity && 
       entity.timestamp && 
-      (Date.now() - entity.timestamp) < CACHE_EXPIRY
+      (Date.now() - entity.timestamp) < CACHE_EXPIRY &&
+      dataCache.cacheVersion === CACHE_VERSION
     );
   }, [dataCache]);
 
   // Función genérica para obtener datos con caché
   const fetchData = useCallback(async (entityName, fetchFunction, params = {}) => {
-    // Si ya hay una solicitud en curso para esta entidad, no iniciar otra
-    if (dataCache[entityName].loading) return dataCache[entityName].data;
+    // Crear una clave única para esta solicitud basada en parámetros
+    const requestKey = `${entityName}:${JSON.stringify(params)}`;
     
-    // Si los datos en caché están frescos, devolverlos sin hacer una nueva llamada
-    if (isCacheFresh(entityName)) {
-      return dataCache[entityName].data;
+    // Si ya hay una solicitud en curso para esta combinación exacta, usar promesa existente
+    if (pendingRequests.current[requestKey]) {
+      return pendingRequests.current[requestKey];
+    }
+    
+    // Usar ref para acceder al cache actual sin dependencias
+    const currentCache = dataCacheRef.current;
+    const entity = currentCache[entityName];
+    
+    // Verificar si los datos en caché están frescos
+    const isFresh = entity && 
+      entity.timestamp && 
+      (Date.now() - entity.timestamp) < CACHE_EXPIRY &&
+      currentCache.cacheVersion === CACHE_VERSION;
+    
+    if (isFresh) {
+      // Para entidades que dependen de params (como provincias basadas en país)
+      // verificamos si los parámetros son diferentes, en cuyo caso no usamos el caché
+      const shouldUseCache = !params || Object.keys(params).length === 0 ||
+        (entityName !== 'provinces' && entityName !== 'municipalities');
+        
+      if (shouldUseCache) {
+        return entity.data;
+      }
     }
     
     // Iniciar la carga
@@ -78,37 +115,57 @@ export const DataProvider = ({ children }) => {
       }
     }));
     
-    try {
-      const responseData = await fetchFunction(params);
-      
-      // Actualizar caché
-      setDataCache(prev => ({
-        ...prev,
-        [entityName]: {
-          data: responseData,
-          timestamp: Date.now(),
-          loading: false,
-          error: null
+    // Crear promesa para esta solicitud
+    const promise = (async () => {
+      try {
+        const controller = new AbortController();
+        const signal = controller.signal;
+        
+        // Añadir signal a params si es posible
+        const configParams = { ...params };
+        
+        const responseData = await fetchFunction(configParams);
+        
+        // Actualizar caché
+        setDataCache(prev => ({
+          ...prev,
+          [entityName]: {
+            data: responseData,
+            timestamp: Date.now(),
+            loading: false,
+            error: null
+          }
+        }));
+        
+        return responseData;
+      } catch (err) {
+        // No registrar errores por solicitudes abortadas
+        if (err.name !== 'AbortError') {
+          console.error(`Error fetching ${entityName}:`, err);
+          
+          // Actualizar estado de error
+          setDataCache(prev => ({
+            ...prev,
+            [entityName]: {
+              ...prev[entityName],
+              loading: false,
+              error: err.message || `Error al cargar ${entityName}`
+            }
+          }));
         }
-      }));
-      
-      return responseData;
-    } catch (err) {
-      console.error(`Error fetching ${entityName}:`, err);
-      
-      // Actualizar estado de error
-      setDataCache(prev => ({
-        ...prev,
-        [entityName]: {
-          ...prev[entityName],
-          loading: false,
-          error: err.message || `Error al cargar ${entityName}`
-        }
-      }));
-      
-      return [];
-    }
-  }, [dataCache, isCacheFresh]);
+        
+        return [];
+      } finally {
+        // Eliminar esta solicitud de las pendientes
+        delete pendingRequests.current[requestKey];
+      }
+    })();
+    
+    // Guardar la promesa para esta solicitud
+    pendingRequests.current[requestKey] = promise;
+    
+    return promise;
+  }, []); // ✅ Sin dependencias problemáticas
 
   // Funciones específicas para cada tipo de datos
   const fetchClients = useCallback(async (params = {}) => {
@@ -177,21 +234,36 @@ export const DataProvider = ({ children }) => {
   
   // Función para invalidar el caché de una entidad
   const invalidateCache = useCallback((entityName) => {
-    setDataCache(prev => ({
-      ...prev,
-      [entityName]: {
-        ...prev[entityName],
-        timestamp: null
-      }
-    }));
+    // Si se proporciona un nombre específico de entidad
+    if (entityName) {
+      setDataCache(prev => ({
+        ...prev,
+        [entityName]: {
+          ...prev[entityName],
+          timestamp: null
+        }
+      }));
+      
+      // Cancelar solicitudes pendientes para esta entidad
+      Object.keys(pendingRequests.current).forEach(key => {
+        if (key.startsWith(`${entityName}:`)) {
+          delete pendingRequests.current[key];
+        }
+      });
+    }
   }, []);
   
   // Función para invalidar todo el caché
   const invalidateAllCache = useCallback(() => {
-    Object.keys(dataCache).forEach(key => {
-      invalidateCache(key);
-    });
-  }, [dataCache, invalidateCache]);
+    // Incrementar versión del caché para invalidar todo
+    setDataCache(prev => ({
+      ...prev,
+      cacheVersion: prev.cacheVersion + 1
+    }));
+    
+    // Cancelar todas las solicitudes pendientes
+    pendingRequests.current = {};
+  }, []);
 
   // Exponer estados y funciones
   const value = useMemo(() => ({

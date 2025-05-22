@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { X } from 'lucide-react';
 import { createPortal } from 'react-dom';
 
@@ -11,6 +11,7 @@ const SIZES = {
   xl: 'max-w-4xl',
   '2xl': 'max-w-6xl',
   '3xl': 'max-w-7xl',
+  '4xl': 'max-w-screen-xl',
   full: 'max-w-full mx-4'
 };
 
@@ -31,6 +32,26 @@ const Modal = ({
   contentClassName = ''
 }) => {
   const modalRef = useRef(null);
+  const [isRendered, setIsRendered] = useState(false);
+  const [isAnimating, setIsAnimating] = useState(false);
+  
+  // Controlar el ciclo de vida del modal
+  useEffect(() => {
+    if (isOpen && !isRendered) {
+      setIsRendered(true);
+      // Permitir que el DOM se actualice antes de iniciar la animación
+      requestAnimationFrame(() => {
+        setIsAnimating(true);
+      });
+    } else if (!isOpen && isRendered) {
+      setIsAnimating(false);
+      // Esperar a que termine la animación antes de desmontar
+      const timer = setTimeout(() => {
+        setIsRendered(false);
+      }, 300); // Coincidir con duration-300
+      return () => clearTimeout(timer);
+    }
+  }, [isOpen, isRendered]);
   
   // Maneja el cierre con la tecla Escape
   useEffect(() => {
@@ -59,8 +80,8 @@ const Modal = ({
     };
   }, [isOpen]);
   
-  // Si el modal está cerrado, no renderizar nada
-  if (!isOpen) return null;
+  // Si el modal no está renderizado, no mostrar nada
+  if (!isRendered) return null;
   
   // Manejador para el clic en el overlay
   const handleOverlayClick = (e) => {
@@ -73,17 +94,17 @@ const Modal = ({
   return createPortal(
     <ModalContext.Provider value={{ onClose }}>
       <div 
-        className={`fixed inset-0 z-50 flex items-center justify-center p-4 transition-opacity duration-200 ${isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'} ${overlayClassName}`}
+        className={`fixed inset-0 z-50 flex items-center justify-center p-4 transition-opacity duration-300 ${isAnimating ? 'opacity-100' : 'opacity-0'} ${overlayClassName}`}
         onMouseDown={handleOverlayClick}
-        style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }} // Usar rgba en lugar de bg-opacity
+        style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }}
         aria-modal="true"
         role="dialog"
       >
         <div 
           ref={modalRef}
-          className={`${SIZES[size] || SIZES.md} w-full bg-white rounded-lg shadow-xl transform transition-all duration-300 flex flex-col ${isOpen ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'} ${contentClassName}`}
+          className={`${SIZES[size] || SIZES.md} w-full bg-white rounded-lg shadow-xl transform transition-all duration-300 flex flex-col ${isAnimating ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'} ${contentClassName}`}
           role="dialog"
-          style={{ maxHeight: '95vh' }} // Limitar altura máxima
+          style={{ maxHeight: '95vh' }}
         >
           {children}
         </div>

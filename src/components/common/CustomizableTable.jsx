@@ -12,6 +12,7 @@ import {
   Minus
 } from 'lucide-react';
 import ThemeConstants from '../../constants/ThemeConstants';
+import { useTableDimensions } from '../../hooks/useContainerDimensions';
 
 // Tooltip simplificado para contenido truncado
 const Tooltip = ({ content, children }) => {
@@ -19,7 +20,7 @@ const Tooltip = ({ content, children }) => {
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const childRef = useRef(null);
 
-  const handleMouseEnter = (e) => {
+  const handleMouseEnter = () => {
     if (!childRef.current) return;
     const isTruncated = childRef.current.scrollWidth > childRef.current.clientWidth;
     if (isTruncated) {
@@ -134,9 +135,13 @@ const ColumnCustomizationMenu = ({
     setColumnSettings(prev => {
       return prev.map(col => {
         if (col.accessor === accessor) {
+          // Calcular el ancho máximo permitido basado en el espacio disponible
+          const containerWidth = window.innerWidth || 1000;
+          const maxAllowedWidth = Math.min(maxColumnWidth, containerWidth / 3); // Máximo 1/3 del contenedor
+          
           const newWidth = Math.max(
             minColumnWidth, 
-            Math.min(col.width + amount, maxColumnWidth)
+            Math.min(col.width + amount, maxAllowedWidth)
           );
           return { ...col, width: newWidth };
         }
@@ -303,8 +308,18 @@ const CustomizableTable = forwardRef(({
   emptyMessage = "No hay datos disponibles",
   infiniteScrollThreshold = 200, // Distancia en px desde el fondo para cargar más
   minColumnWidth = 60, // Ancho mínimo para columnas en px
-  maxColumnWidth = 500, // Ancho máximo para columnas en px
+  maxColumnWidth = 300, // Ancho máximo para columnas en px (reducido para evitar overflow)
 }, ref) => {
+  // Hook para dimensiones de tabla (debe estar al inicio)
+  const { 
+    containerRef: tableDimensionsRef, 
+    availableWidth, 
+    calculateColumnWidths: calculateWidths 
+  } = useTableDimensions({
+    padding: 24,
+    excludeElements: onView ? ['[data-actions-column]'] : []
+  });
+
   // Estado para el orden de columnas
   const [columnOrder, setColumnOrder] = useState(
     () => {
@@ -362,7 +377,7 @@ const CustomizableTable = forwardRef(({
   const [selectedRow, setSelectedRow] = useState(null);
   const tableContainerRef = useRef(null);
   const tableRef = useRef(null);
-  const [tableWidth, setTableWidth] = useState(0);
+  // const [tableWidth, setTableWidth] = useState(0);
   const [columnMenuOpen, setColumnMenuOpen] = useState(false);
   const [columnMenuPosition, setColumnMenuPosition] = useState({ x: 0, y: 0 });
   const [draggedHeader, setDraggedHeader] = useState(null);
@@ -397,7 +412,7 @@ const CustomizableTable = forwardRef(({
     if (tableContainerRef.current) {
       const resizeObserver = new ResizeObserver(entries => {
         if (entries[0]) {
-          setTableWidth(entries[0].contentRect.width);
+          // setTableWidth(entries[0].contentRect.width);
         }
       });
       
@@ -599,48 +614,47 @@ const CustomizableTable = forwardRef(({
     .map(accessor => columns.find(col => col.accessor === accessor))
     .filter(Boolean);
   
-  // Calcular anchos de columnas
-  const calculateColumnWidths = () => {
-    const totalWidth = tableWidth || tableContainerRef.current?.clientWidth || 1000;
-    const actionColumnWidth = onView ? 40 : 0;
-    const availableWidth = totalWidth - actionColumnWidth;
-    
-    const columnsWithCustomWidth = orderedVisibleColumns.filter(col => columnWidths[col.accessor]);
-    const fixedWidth = columnsWithCustomWidth.reduce((sum, col) => {
-      return sum + columnWidths[col.accessor];
-    }, 0);
-    
-    const columnsWithPresetWidth = orderedVisibleColumns.filter(col => 
-      !columnWidths[col.accessor] && col.width);
-    const presetWidth = columnsWithPresetWidth.reduce((sum, col) => {
-      const match = col.width.match(/w-(\d+)/);
-      return sum + (match ? parseInt(match[1]) * 4 : 0);
-    }, 0);
-    
-    const remainingColumns = orderedVisibleColumns.length - columnsWithCustomWidth.length - columnsWithPresetWidth.length;
-    const flexColumnWidth = Math.max((availableWidth - fixedWidth - presetWidth) / (remainingColumns || 1), minColumnWidth);
-    
-    return {
-      totalWidth,
-      flexColumnWidth
-    };
-  };
-  
-  const { flexColumnWidth } = calculateColumnWidths();
+  // Combinar refs
+  useEffect(() => {
+    if (tableDimensionsRef && tableDimensionsRef.current && tableContainerRef.current) {
+      // Sincronizar las referencias
+      tableDimensionsRef.current = tableContainerRef.current;
+    }
+  }, [tableDimensionsRef]);
+
+  // Calcular anchos de columnas usando el hook optimizado
+  const { columnWidths: calculatedWidths, maxTableWidth } = calculateWidths(
+    columns, 
+    visibleColumns, 
+    columnWidths
+  );
+
+  // Ancho de columna flexible para columnas sin ancho específico
+  const flexColumnWidth = Math.max(
+    availableWidth && orderedVisibleColumns.length > 0 
+      ? availableWidth / orderedVisibleColumns.length 
+      : 120,
+    minColumnWidth
+  );
 
   return (
     <div className="flex flex-col h-full" ref={ref}>
       {/* Tabla con scroll infinito */}
       <div 
-        className="overflow-auto flex-grow border border-gray-200 rounded-md bg-white" 
+        className="overflow-hidden flex-grow border border-gray-200 rounded-md bg-white" 
         style={{ maxHeight: 'calc(100vh - 220px)', minHeight: '400px' }}
         ref={tableContainerRef}
       >
+        <div className="overflow-auto h-full w-full">
         <table 
-          className="w-full table-auto text-xs"
+          className="w-full text-xs"
           id={`table-${tableId}`}
           ref={tableRef}
-          style={{ tableLayout: 'fixed' }}
+          style={{ 
+            tableLayout: 'fixed',
+            width: maxTableWidth ? `${Math.min(maxTableWidth, availableWidth)}px` : '100%',
+            maxWidth: availableWidth ? `${availableWidth}px` : '100%'
+          }}
         >
           <thead className="bg-gray-50 sticky top-0 z-10">
             <tr 
@@ -656,13 +670,13 @@ const CustomizableTable = forwardRef(({
                     dragOverHeader === column.accessor ? 'bg-blue-50' : ''
                   } ${draggedHeader === column.accessor ? 'opacity-50' : ''}`}
                   style={{ 
-                    width: columnWidths[column.accessor] ? 
-                      `${columnWidths[column.accessor]}px` : 
-                      column.width ? undefined : `${flexColumnWidth}px`,
+                    width: calculatedWidths[column.accessor] 
+                      ? `${calculatedWidths[column.accessor]}px`
+                      : `${flexColumnWidth}px`,
                     minWidth: `${minColumnWidth}px`,
-                    maxWidth: columnWidths[column.accessor] ? 
-                      `${columnWidths[column.accessor]}px` : 
-                      column.width ? undefined : `${flexColumnWidth * 1.5}px`,
+                    maxWidth: calculatedWidths[column.accessor] 
+                      ? `${calculatedWidths[column.accessor]}px`
+                      : `${flexColumnWidth}px`,
                   }}
                   title={column.header}
                   draggable="true"
@@ -692,7 +706,7 @@ const CustomizableTable = forwardRef(({
                   onClick={() => handleRowClick(row)}
                   className={`
                     hover:bg-gray-50 cursor-pointer border-b border-gray-100
-                    ${selectable && selectedRow === row ? 'bg-blue-50' : ''}
+                    ${selectable && selectedRow === row ? 'bg-blue-500 text-white font-bold border border-blue-600' : ''}
                     ${rowIndex % 2 === 0 ? 'bg-white' : 'bg-gray-50'}
                   `}
                 >
@@ -701,9 +715,13 @@ const CustomizableTable = forwardRef(({
                       key={`${rowIndex}-${column.accessor}`}
                       className="px-2 py-1 text-xs text-gray-900"
                       style={{
-                        maxWidth: columnWidths[column.accessor] ? 
-                          `${columnWidths[column.accessor]}px` : 
-                          column.width ? undefined : `${flexColumnWidth * 1.5}px`,
+                        width: calculatedWidths[column.accessor] 
+                          ? `${calculatedWidths[column.accessor]}px`
+                          : `${flexColumnWidth}px`,
+                        minWidth: `${minColumnWidth}px`,
+                        maxWidth: calculatedWidths[column.accessor] 
+                          ? `${calculatedWidths[column.accessor]}px`
+                          : `${flexColumnWidth}px`,
                       }}
                     >
                       {column.render ? (
@@ -756,6 +774,7 @@ const CustomizableTable = forwardRef(({
             Has llegado al final de los resultados
           </div>
         )}
+        </div>
       </div>
       
       {/* Barra de estado y customización */}

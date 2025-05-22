@@ -14,11 +14,26 @@ export const ModalProvider = ({ children }) => {
 
   // Función para abrir un modal
   const openModal = useCallback((id, props = {}) => {
-    setModals(prev => ({
-      ...prev,
-      [id]: { isOpen: true, ...props }
-    }));
-  }, []);
+    // Cerrar modales existentes con el mismo ID si están abiertos
+    if (id in modals) {
+      setModals(prev => {
+        const updated = { ...prev };
+        delete updated[id];
+        return updated;
+      });
+      
+      // Abrir inmediatamente para optimizar la velocidad
+      setModals(prev => ({
+        ...prev,
+        [id]: { isOpen: true, ...props }
+      }));
+    } else {
+      setModals(prev => ({
+        ...prev,
+        [id]: { isOpen: true, ...props }
+      }));
+    }
+  }, [modals]);
 
   // Función para cerrar un modal
   const closeModal = useCallback((id) => {

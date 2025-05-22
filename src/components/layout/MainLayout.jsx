@@ -19,7 +19,7 @@ import {
 } from 'lucide-react';
 import ThemeConstants from '../../constants/ThemeConstants';
 // Importaremos el logo condicionalmente para evitar errores
-const logoPath = '/logoCr.png';
+const logoPath = '/logoC.jpg';
 
 const LAYOUT_TYPE_KEY = 'canagrosa-layout-type';
 
@@ -82,6 +82,38 @@ const MainLayout = ({ children }) => {
   };
 
   // Estructura de navegación simplificada
+  // Función para obtener la información de sección y subsección
+  const getSectionInfo = () => {
+    const path = location.pathname;
+    
+    // Dashboard
+    if (path === '/') {
+      return { section: 'Dashboard', subsection: null };
+    }
+    
+    // Sección Mantenimiento
+    if (path.includes('/clientes')) {
+      return { section: 'Mantenimiento', subsection: 'Clientes' };
+    }
+    
+    if (path.includes('/usuarios')) {
+      return { section: 'Mantenimiento', subsection: 'Usuarios' };
+    }
+    
+    // Sección Laboratorio
+    if (path.includes('/muestras')) {
+      return { section: 'Laboratorio', subsection: 'Muestras' };
+    }
+    
+    // Rutas de autenticación
+    if (path.includes('/login')) {
+      return { section: 'Autenticación', subsection: 'Iniciar Sesión' };
+    }
+    
+    // Fallback para rutas no definidas
+    return { section: 'Aplicación', subsection: null };
+  };
+
   const navStructure = [
     {
       id: 'dashboard',
@@ -141,9 +173,11 @@ const MainLayout = ({ children }) => {
       <div className={`flex flex-col h-screen ${ThemeConstants.bgColors.page}`}>
         {/* Header Navigation */}
         <header className={`${ThemeConstants.bgColors.header} ${ThemeConstants.shadows.sm} sticky top-0 z-40`}>
-          <div className="flex justify-between items-center px-6 py-3">
+          <div className="flex justify-between items-center h-16">
+              <div className='h-full bg-white flex items-center justify-center '>
+                <img src={logoPath} alt="CANAGROSA Logo" className="h-8 m-5 " />
+              </div>
             <div className="flex items-center">
-              <img src={logoPath} alt="CANAGROSA Logo" className="h-8 mr-6" />
               
               <nav className="hidden md:block">
                 <ul className="flex space-x-2">
@@ -246,7 +280,8 @@ const MainLayout = ({ children }) => {
         </header>
         
         {/* Page Content */}
-        <main className={`flex-1 overflow-auto p-6 ${ThemeConstants.textColors.primary}`}>
+        <main className={`flex-1 overflow-hidden p-6 ${ThemeConstants.textColors.primary}`}
+              style={{ height: 'calc(100vh - 60px)' }}>
           {children}
         </main>
       </div>
@@ -261,21 +296,23 @@ const MainLayout = ({ children }) => {
           sidebarOpen ? 'w-64' : 'w-20'
         }`}
       >
-        <div className="flex items-center justify-between p-4 border-b border-slate-700">
+        <div className="flex items-center justify-between p-3.5 bg-white border-b border-white-700">
           <div className={`${sidebarOpen ? 'block' : 'hidden'}`}>
             <img src={logoPath} alt="CANAGROSA Logo" className="h-8" />
           </div>
           <div className="flex items-center">
-            <button 
+        {sidebarOpen && (
+                      <button 
               onClick={toggleLayoutMode}
-              className={`p-1 mr-2 ${ThemeConstants.rounded.md} hover:bg-slate-700 focus:outline-none`}
+              className={`p-1 mr-2 ${ThemeConstants.rounded.md}  text-slate-700 cursor-pointer hover:text-slate-500 focus:outline-none`}
               title="Cambiar a modo cabecera"
             >
               <ArrowRightToLine size={20} />
             </button>
+        )}
             <button 
               onClick={toggleSidebar}
-              className={`p-1 ${ThemeConstants.rounded.md} hover:bg-slate-700 focus:outline-none`}
+              className={`p-1 ${ThemeConstants.rounded.md} text-slate-700  cursor-pointer hover:text-slate-500 focus:outline-none`}
             >
               {sidebarOpen ? <X size={20} /> : <Menu size={20} />}
             </button>
@@ -362,9 +399,10 @@ const MainLayout = ({ children }) => {
         <header className={`${ThemeConstants.bgColors.header} ${ThemeConstants.shadows.sm} sticky top-0 z-30`}>
           <div className="flex justify-between items-center px-6 py-3">
             <h1 className={`text-xl font-semibold ${ThemeConstants.textColors.header}`}>
-              {navStructure.find(item => item.active)?.label || 
-               navStructure.find(item => item.submenu?.some(sub => sub.active))?.label ||
-               'Dashboard'}
+              {(() => {
+                const { section, subsection } = getSectionInfo();
+                return subsection ? `${section} : ${subsection}` : section;
+              })()}
             </h1>
             
             <div className="flex items-center space-x-4">
@@ -407,7 +445,8 @@ const MainLayout = ({ children }) => {
         </header>
         
         {/* Page Content */}
-        <main className={`flex-1 overflow-auto p-6 ${ThemeConstants.textColors.primary}`}>
+        <main className={`flex-1 overflow-hidden p-6 ${ThemeConstants.textColors.primary}`}
+              style={{ height: 'calc(100vh - 60px)' }}>
           {children}
         </main>
       </div>
