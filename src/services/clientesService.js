@@ -273,16 +273,13 @@ const clientesService = {
           throw new Error('Formato de datos no esperado');
         }
         
-        // Preparar datos para el cliente clonado
+        // Preparar datos para el cliente clonado - copiar TODO excepto ID
         const datosClonado = {
-          ...datosCliente,
-          // Remover el ID para que se genere uno nuevo
-          ID_CLIENTE: null,
-          // Modificar el nombre para indicar que es una copia
-          NOMBRE: `${datosCliente.NOMBRE} (duplicado)`,
-          // Limpiar campos que no deben duplicarse
-          CIF: '', // El CIF debe ser único
-          // Mantener otros campos como están
+          ...datosCliente, // Copiar TODO el objeto tal como viene de la base de datos
+          ID_CLIENTE: null, // Solo remover ID para que se genere uno nuevo
+          NOMBRE: `${datosCliente.NOMBRE} (duplicado)` // Solo modificar el nombre
+          // Mantener CIF y todos los demás campos exactamente como están
+          // Si hay conflictos de unicidad, la API debe manejarlos
         };
         
         // Crear el cliente clonado

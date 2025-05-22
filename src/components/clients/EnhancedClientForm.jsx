@@ -106,15 +106,13 @@ const ClientFormContent = memo(({
     if (isClone && cloneData) {
       setLoading(true);
       try {
-        // Preparar datos para clonación (sin ID y con nombre modificado)
+        // Preparar datos para clonación - copiar TODO el objeto excepto ID
         const cloneClientData = {
-          ...cloneData,
-          ID_CLIENTE: null,
-          NOMBRE: `${cloneData.NOMBRE} (duplicado)`,
-          CIF: '', // Limpiar CIF (debe ser único)
-          // Limpiar otros campos que podrían requerir valores únicos
-          EMAIL: cloneData.EMAIL ? `${cloneData.EMAIL}` : '', // Mantener email para referencia pero podría requerir modificación
-          // Mantener todos los demás campos incluyendo direcciones, configuraciones, responsables, etc.
+          ...cloneData, // Copiar TODO tal como viene de la base de datos
+          ID_CLIENTE: null, // Solo remover ID para que se genere uno nuevo
+          NOMBRE: `${cloneData.NOMBRE} (duplicado)` // Solo modificar el nombre
+          // Mantener CIF, emails y todos los demás campos exactamente como están
+          // El usuario puede modificarlos en el formulario si es necesario
         };
         
         loadClientData(cloneClientData, cloneData.responsables || []);
