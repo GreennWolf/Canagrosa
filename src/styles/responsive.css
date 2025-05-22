@@ -1,0 +1,299 @@
+/* Utilidades CSS responsive para Canagrosa */
+
+/* === CONTENEDORES RESPONSIVE === */
+.container-responsive {
+  width: 100%;
+  max-width: 100%;
+  margin: 0 auto;
+  padding-left: 0.5rem;
+  padding-right: 0.5rem;
+}
+
+@media (min-width: 640px) {
+  .container-responsive {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+}
+
+@media (min-width: 768px) {
+  .container-responsive {
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .container-responsive {
+    padding-left: 2rem;
+    padding-right: 2rem;
+  }
+}
+
+/* === GRIDS RESPONSIVE === */
+.grid-responsive {
+  display: grid;
+  gap: 0.5rem;
+  grid-template-columns: 1fr;
+}
+
+@media (min-width: 640px) {
+  .grid-responsive {
+    gap: 1rem;
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 768px) {
+  .grid-responsive {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (min-width: 1024px) {
+  .grid-responsive {
+    gap: 1.5rem;
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+/* === FORMULARIOS RESPONSIVE === */
+.form-responsive {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: 1fr;
+}
+
+@media (min-width: 768px) {
+  .form-responsive {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.form-field-full {
+  grid-column: 1 / -1;
+}
+
+/* === TARJETAS RESPONSIVE === */
+.card-responsive {
+  background: white;
+  border-radius: 0.5rem;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+  padding: 1rem;
+  margin-bottom: 1rem;
+}
+
+@media (min-width: 768px) {
+  .card-responsive {
+    padding: 1.5rem;
+  }
+}
+
+/* === NAVEGACIÓN RESPONSIVE === */
+.nav-responsive {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+@media (min-width: 768px) {
+  .nav-responsive {
+    flex-direction: row;
+    gap: 1rem;
+  }
+}
+
+/* === BOTONES RESPONSIVE === */
+.btn-responsive {
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+  width: 100%;
+  justify-content: center;
+}
+
+@media (min-width: 640px) {
+  .btn-responsive {
+    width: auto;
+    padding: 0.625rem 1.25rem;
+  }
+}
+
+@media (min-width: 768px) {
+  .btn-responsive {
+    font-size: 1rem;
+    padding: 0.75rem 1.5rem;
+  }
+}
+
+/* === TEXTO RESPONSIVE === */
+.text-responsive-xs {
+  font-size: 0.75rem;
+}
+
+.text-responsive-sm {
+  font-size: 0.875rem;
+}
+
+.text-responsive-base {
+  font-size: 0.875rem;
+}
+
+.text-responsive-lg {
+  font-size: 1rem;
+}
+
+.text-responsive-xl {
+  font-size: 1.125rem;
+}
+
+@media (min-width: 640px) {
+  .text-responsive-base { font-size: 1rem; }
+  .text-responsive-lg { font-size: 1.125rem; }
+  .text-responsive-xl { font-size: 1.25rem; }
+}
+
+@media (min-width: 768px) {
+  .text-responsive-lg { font-size: 1.25rem; }
+  .text-responsive-xl { font-size: 1.5rem; }
+}
+
+/* === ESPACIADO RESPONSIVE === */
+.spacing-responsive-xs { margin: 0.5rem; }
+.spacing-responsive-sm { margin: 0.5rem; }
+.spacing-responsive-md { margin: 1rem; }
+.spacing-responsive-lg { margin: 1rem; }
+
+@media (min-width: 640px) {
+  .spacing-responsive-sm { margin: 0.75rem; }
+  .spacing-responsive-md { margin: 1.25rem; }
+  .spacing-responsive-lg { margin: 1.5rem; }
+}
+
+@media (min-width: 768px) {
+  .spacing-responsive-md { margin: 1.5rem; }
+  .spacing-responsive-lg { margin: 2rem; }
+}
+
+/* === OCULTADORES RESPONSIVE === */
+.hide-mobile {
+  display: none;
+}
+
+@media (min-width: 768px) {
+  .hide-mobile {
+    display: block;
+  }
+}
+
+.hide-desktop {
+  display: block;
+}
+
+@media (min-width: 768px) {
+  .hide-desktop {
+    display: none;
+  }
+}
+
+.show-mobile-only {
+  display: block;
+}
+
+@media (min-width: 640px) {
+  .show-mobile-only {
+    display: none;
+  }
+}
+
+.show-tablet-up {
+  display: none;
+}
+
+@media (min-width: 768px) {
+  .show-tablet-up {
+    display: block;
+  }
+}
+
+/* === OVERFLOW RESPONSIVE === */
+.overflow-responsive {
+  overflow: hidden;
+}
+
+@media (min-width: 768px) {
+  .overflow-responsive {
+    overflow: visible;
+  }
+}
+
+.overflow-x-responsive {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* === MODALES RESPONSIVE === */
+.modal-responsive {
+  position: fixed;
+  inset: 0;
+  padding: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.modal-content-responsive {
+  background: white;
+  border-radius: 0.5rem;
+  width: 100%;
+  max-width: 32rem;
+  max-height: calc(100vh - 2rem);
+  overflow-y: auto;
+}
+
+@media (min-width: 768px) {
+  .modal-responsive {
+    padding: 2rem;
+  }
+  
+  .modal-content-responsive {
+    max-width: 42rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .modal-content-responsive {
+    max-width: 56rem;
+  }
+}
+
+/* === HELPERS PARA TRUNCADO RESPONSIVE === */
+.truncate-responsive {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (min-width: 768px) {
+  .truncate-responsive {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: unset;
+  }
+}
+
+/* === ANIMACIONES OPTIMIZADAS PARA MÓVIL === */
+@media (prefers-reduced-motion: reduce) {
+  .transition-responsive {
+    transition: none !important;
+  }
+}
+
+.transition-responsive {
+  transition: all 0.2s ease-in-out;
+}
+
+@media (min-width: 768px) {
+  .transition-responsive {
+    transition: all 0.3s ease-in-out;
+  }
+}

@@ -27,9 +27,9 @@ const FormField = memo(({
   helpText = null,
   ...props
 }) => {
-  // Determinar clases CSS basadas en el estado
+  // Determinar clases CSS basadas en el estado - responsive
   const getInputClasses = () => {
-    const baseClasses = `w-full px-2 py-1 text-xs border rounded-md focus:outline-none focus:ring-1 transition-colors ${
+    const baseClasses = `w-full px-3 py-2 sm:px-2 sm:py-1 text-sm sm:text-xs border rounded-md focus:outline-none focus:ring-1 transition-colors ${
       disabled ? 'bg-gray-100 cursor-not-allowed' : 'bg-white'
     } text-gray-800`;
     
@@ -138,12 +138,12 @@ const FormField = memo(({
   };
 
   return (
-    <div className={`mb-2 ${className}`}>
+    <div className={`mb-3 sm:mb-2 ${className}`}>
       {/* Label */}
       {label && type !== 'checkbox' && type !== 'radio' && (
         <label 
           htmlFor={id || name} 
-          className={`block text-xs text-gray-700 mb-1 ${labelClassName}`}
+          className={`block text-sm sm:text-xs text-gray-700 mb-2 sm:mb-1 font-medium ${labelClassName}`}
         >
           {label}
           {required && <span className="text-red-500 ml-1">*</span>}

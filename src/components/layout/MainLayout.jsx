@@ -503,33 +503,35 @@ const MainLayout = ({ children }) => {
 
       {/* Main Content */}
       <div className={`flex-1 flex flex-col ${ThemeConstants.transitions.default} ${
-        sidebarOpen ? 'ml-64' : 'ml-20'
+        isMobile ? 'ml-0' : (sidebarOpen ? 'ml-64' : 'ml-20')
       }`}>
         {/* Top Navigation Bar */}
         <header className={`${ThemeConstants.bgColors.header} ${ThemeConstants.shadows.sm} sticky top-0 z-30`}>
-          <div className="flex justify-between items-center px-6 py-3">
-            <h1 className={`text-xl font-semibold ${ThemeConstants.textColors.header}`}>
+          <div className="flex justify-between items-center px-3 sm:px-6 py-3">
+            <h1 className={`text-lg sm:text-xl font-semibold ${ThemeConstants.textColors.header} truncate`}>
               {(() => {
                 const { section, subsection } = getSectionInfo();
                 return subsection ? `${section} : ${subsection}` : section;
               })()}
             </h1>
             
-            <div className="flex items-center space-x-4">
-              <button className={`p-2 ${ThemeConstants.rounded.full} hover:bg-slate-600`}>
+            <div className="flex items-center space-x-2 sm:space-x-4">
+              {/* Notifications - Hidden on mobile */}
+              <button className={`hidden sm:block p-2 ${ThemeConstants.rounded.full} hover:bg-slate-600`}>
                 <Bell size={20} className="text-slate-200" />
               </button>
               
+              {/* User Menu */}
               <div className="relative">
                 <button 
                   onClick={() => setUserMenuOpen(!userMenuOpen)} 
-                  className="flex items-center space-x-3 focus:outline-none text-slate-200"
+                  className="flex items-center space-x-1 sm:space-x-3 focus:outline-none text-slate-200"
                 >
-                  <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white">
-                    <User size={18} />
+                  <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-blue-600 flex items-center justify-center text-white">
+                    <User size={16} className="sm:w-4 sm:h-4" />
                   </div>
-                  <span className="font-medium">{currentUser?.USUARIO || 'Usuario'}</span>
-                  <ChevronDown size={16} className="text-slate-300" />
+                  <span className="font-medium hidden sm:inline text-sm">{currentUser?.USUARIO || 'Usuario'}</span>
+                  <ChevronDown size={14} className="text-slate-300" />
                 </button>
                 
                 {userMenuOpen && (
@@ -555,8 +557,8 @@ const MainLayout = ({ children }) => {
         </header>
         
         {/* Page Content */}
-        <main className={`flex-1 overflow-hidden p-6 ${ThemeConstants.textColors.primary}`}
-              style={{ height: 'calc(100vh - 60px)' }}>
+        <main className={`flex-1 overflow-hidden p-2 sm:p-4 lg:p-6 ${ThemeConstants.textColors.primary}`}
+              style={{ height: 'calc(100vh - 64px)' }}>
           {children}
         </main>
       </div>

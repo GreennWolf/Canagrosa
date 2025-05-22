@@ -2,17 +2,17 @@ import React, { useEffect, useRef, useState } from 'react';
 import { X } from 'lucide-react';
 import { createPortal } from 'react-dom';
 
-// Tamaños disponibles para el modal
+// Tamaños disponibles para el modal - responsive
 const SIZES = {
-  xs: 'max-w-sm',
-  sm: 'max-w-md',
-  md: 'max-w-lg',
-  lg: 'max-w-2xl',
-  xl: 'max-w-4xl',
-  '2xl': 'max-w-6xl',
-  '3xl': 'max-w-7xl',
-  '4xl': 'max-w-screen-xl',
-  full: 'max-w-full mx-4'
+  xs: 'max-w-sm w-full mx-4',
+  sm: 'max-w-md w-full mx-4',
+  md: 'max-w-lg w-full mx-4',
+  lg: 'max-w-2xl w-full mx-4',
+  xl: 'max-w-4xl w-full mx-4',
+  '2xl': 'max-w-6xl w-full mx-4',
+  '3xl': 'max-w-7xl w-full mx-4',
+  '4xl': 'max-w-screen-xl w-full mx-4',
+  full: 'max-w-full mx-2 sm:mx-4'
 };
 
 // Contexto interno para compartir onClose entre componentes
@@ -102,9 +102,12 @@ const Modal = ({
       >
         <div 
           ref={modalRef}
-          className={`${SIZES[size] || SIZES.md} w-full bg-white rounded-lg shadow-xl transform transition-all duration-300 flex flex-col ${isAnimating ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'} ${contentClassName}`}
+          className={`${SIZES[size] || SIZES.md} bg-white rounded-lg sm:rounded-lg shadow-xl transform transition-all duration-300 flex flex-col ${isAnimating ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'} ${contentClassName}`}
           role="dialog"
-          style={{ maxHeight: '95vh' }}
+          style={{ 
+            maxHeight: '95vh',
+            minHeight: window.innerWidth < 640 ? '50vh' : 'auto'
+          }}
         >
           {children}
         </div>
@@ -125,18 +128,18 @@ const ModalHeader = ({
   const { onClose } = React.useContext(ModalContext);
   
   return (
-    <div className={`flex justify-between items-center p-4 border-b bg-slate-800 text-white rounded-t-lg ${className}`}>
-      <div className="font-medium">
+    <div className={`flex justify-between items-center p-3 sm:p-4 border-b bg-slate-800 text-white rounded-t-lg ${className}`}>
+      <div className="font-medium text-sm sm:text-base truncate pr-2">
         {children}
       </div>
       
       {showCloseButton && (
         <button 
           onClick={onClose} 
-          className="p-1 rounded-full text-white hover:bg-blue-700 focus:outline-none"
+          className="p-1 rounded-full text-white hover:bg-blue-700 focus:outline-none flex-shrink-0"
           aria-label="Cerrar"
         >
-          <X size={20} />
+          <X size={18} className="sm:w-5 sm:h-5" />
         </button>
       )}
     </div>
@@ -151,7 +154,7 @@ const ModalBody = ({
   className = '' 
 }) => {
   return (
-    <div className={`flex-grow p-4 overflow-y-auto ${className}`}>
+    <div className={`flex-grow p-3 sm:p-4 lg:p-6 overflow-y-auto ${className}`}>
       {children}
     </div>
   );
@@ -165,7 +168,7 @@ const ModalFooter = ({
   className = '' 
 }) => {
   return (
-    <div className={`p-4 border-t bg-gray-100 rounded-b-lg ${className}`}>
+    <div className={`p-3 sm:p-4 border-t bg-gray-100 rounded-b-lg flex flex-col sm:flex-row gap-2 sm:gap-3 ${className}`}>
       {children}
     </div>
   );
