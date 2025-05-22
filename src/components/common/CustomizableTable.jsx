@@ -12,7 +12,7 @@ import {
   Minus
 } from 'lucide-react';
 import ThemeConstants from '../../constants/ThemeConstants';
-import { useTableDimensions } from '../../hooks/useContainerDimensions';
+import useContainerDimensions from '../../hooks/useContainerDimensions';
 
 // Tooltip simplificado para contenido truncado
 const Tooltip = ({ content, children }) => {
@@ -313,9 +313,8 @@ const CustomizableTable = forwardRef(({
   // Hook para dimensiones de tabla (debe estar al inicio)
   const { 
     containerRef: tableDimensionsRef, 
-    availableWidth, 
-    calculateColumnWidths: calculateWidths 
-  } = useTableDimensions({
+    availableWidth
+  } = useContainerDimensions({
     padding: 24,
     excludeElements: onView ? ['[data-actions-column]'] : []
   });
@@ -622,12 +621,9 @@ const CustomizableTable = forwardRef(({
     }
   }, [tableDimensionsRef]);
 
-  // Calcular anchos de columnas usando el hook optimizado
-  const { columnWidths: calculatedWidths, maxTableWidth } = calculateWidths(
-    columns, 
-    visibleColumns, 
-    columnWidths
-  );
+  // Calcular anchos de columnas
+  const calculatedWidths = columnWidths;
+  const maxTableWidth = availableWidth || window.innerWidth * 0.9;
 
   // Ancho de columna flexible para columnas sin ancho específico
   const flexColumnWidth = Math.max(
