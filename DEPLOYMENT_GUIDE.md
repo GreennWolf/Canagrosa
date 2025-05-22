@@ -34,14 +34,34 @@ El archivo `_redirects` ya está incluido en `public/_redirects`:
 ```
 
 ### 4. Vercel
-Crear `vercel.json` en la raíz del proyecto:
+El archivo `vercel.json` ya está incluido en la raíz del proyecto con la configuración correcta:
+
 ```json
 {
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "framework": "vite",
   "rewrites": [
-    { "source": "/(.*)", "destination": "/index.html" }
+    {
+      "source": "/((?!api/.*).*)",
+      "destination": "/index.html"
+    }
   ]
 }
 ```
+
+**Pasos para desplegar en Vercel:**
+1. Conecta tu repositorio en [vercel.com](https://vercel.com)
+2. Vercel detectará automáticamente que es un proyecto Vite
+3. Las configuraciones de build están en `vercel.json`
+4. El despliegue será automático en cada push a main
+
+**Si sigues teniendo problemas 404:**
+1. Ve a tu dashboard de Vercel
+2. Entra a tu proyecto → Settings → Functions
+3. Asegúrate de que el "Output Directory" sea `dist`
+4. Verifica que el "Build Command" sea `npm run build`
+5. Redeploy manualmente desde el dashboard
 
 ### 5. Firebase Hosting
 En `firebase.json`:
