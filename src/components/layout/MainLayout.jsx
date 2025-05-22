@@ -32,6 +32,8 @@ const MainLayout = ({ children }) => {
   const [isHeaderMode, setIsHeaderMode] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   
   // Estado para el menú desplegable activo (solo uno a la vez)
   const [activeDropdown, setActiveDropdown] = useState(null);
@@ -44,9 +46,37 @@ const MainLayout = ({ children }) => {
     }
   }, []);
 
-  // Cierra los menús desplegables al cambiar de ruta
+  // Detectar tamaño de pantalla para responsive
+  useEffect(() => {
+    const handleResize = () => {
+      const mobile = window.innerWidth < 768;
+      setIsMobile(mobile);
+      
+      // En móvil, forzar modo header y cerrar sidebar
+      if (mobile) {
+        setIsHeaderMode(true);
+        setSidebarOpen(false);
+        setIsMobileMenuOpen(false);
+      }
+    };
+
+    // Detectar tamaño inicial
+    handleResize();
+    
+    // Escuchar cambios de tamaño
+    window.addEventListener('resize', handleResize);
+    
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // Cierra los menús desplegables al cambiar de ruta y actualiza el título
   useEffect(() => {
     setActiveDropdown(null);
+    
+    // Actualizar título de la página según la ruta
+    const { section, subsection } = getSectionInfo();
+    const pageTitle = subsection ? `${subsection} - Canagrosa` : `${section} - Canagrosa`;
+    document.title = pageTitle;
   }, [location.pathname]);
 
   // Guarda la preferencia de diseño cuando cambia
@@ -173,102 +203,108 @@ const MainLayout = ({ children }) => {
       <div className={`flex flex-col h-screen ${ThemeConstants.bgColors.page}`}>
         {/* Header Navigation */}
         <header className={`${ThemeConstants.bgColors.header} ${ThemeConstants.shadows.sm} sticky top-0 z-40`}>
-          <div className="flex justify-between items-center h-16">
-              <div className='h-full bg-white flex items-center justify-center '>
-                <img src={logoPath} alt="CANAGROSA Logo" className="h-8 m-5 " />
-              </div>
-            <div className="flex items-center">
-              
-              <nav className="hidden md:block">
-                <ul className="flex space-x-2">
-                  {navStructure.map(item => (
-                    <li key={item.id} className="relative group">
-                      <button
-                        onClick={item.path ? () => navigate(item.path) : item.onClick}
-                        className={`flex items-center px-3 py-2 ${ThemeConstants.rounded.md} ${
-                          item.active ? 'bg-blue-700' : 'hover:bg-slate-700'
-                        }`}
-                      >
-                        <span className="mr-2">{item.icon}</span>
-                        <span>{item.label}</span>
-                        {item.hasSubmenu && (
-                          <ChevronDown 
-                            size={14} 
-                            className={`ml-1 ${ThemeConstants.transitions.default} ${
-                              item.submenuOpen ? 'rotate-180' : ''
-                            }`}
-                          />
-                        )}
-                      </button>
-
-                      {/* Dropdown for top-level menu items */}
-                      {item.hasSubmenu && item.submenuOpen && (
-                        <div className={`absolute left-0 mt-1 w-48 ${ThemeConstants.bgColors.sidebar} ${ThemeConstants.rounded.md} ${ThemeConstants.shadows.lg} z-50 py-1`}>
-                          {item.submenu.map(subItem => (
-                            <button
-                              key={subItem.id}
-                              onClick={() => navigate(subItem.path)}
-                              className={`flex items-center w-full px-4 py-2 text-left ${
-                                subItem.active ? 'bg-slate-700' : 'hover:bg-slate-700'
-                              }`}
-                            >
-                              <span className="mr-2">{subItem.icon}</span>
-                              <span>{subItem.label}</span>
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-              </nav>
-
-              {/* Mobile menu button */}
-              <button 
-                className="md:hidden p-2 rounded-md text-slate-200 hover:bg-slate-700"
-                onClick={() => setIsHeaderMode(false)}
-              >
-                <Menu size={24} />
-              </button>
+          <div className="flex justify-between items-center h-16 px-2 sm:px-4">
+            {/* Logo */}
+            <div className='h-full bg-white flex items-center justify-center'>
+              <img src={logoPath} alt="CANAGROSA Logo" className="h-6 sm:h-8 mx-2 sm:mx-5" />
             </div>
             
-            <div className="flex items-center space-x-4">
-              <button 
-                onClick={toggleLayoutMode}
-                className={`p-2 ${ThemeConstants.rounded.full} hover:bg-slate-600 text-slate-200`}
-                title="Cambiar a modo barra lateral"
-              >
-                <ArrowLeftToLine size={20} />
-              </button>
+            {/* Desktop Navigation */}
+            <nav className="hidden lg:block">
+              <ul className="flex space-x-1">
+                {navStructure.map(item => (
+                  <li key={item.id} className="relative group">
+                    <button
+                      onClick={item.path ? () => navigate(item.path) : item.onClick}
+                      className={`flex items-center px-2 xl:px-3 py-2 text-sm ${ThemeConstants.rounded.md} ${
+                        item.active ? 'bg-blue-700' : 'hover:bg-slate-700'
+                      }`}
+                    >
+                      <span className="mr-1 xl:mr-2">{item.icon}</span>
+                      <span className="hidden xl:inline">{item.label}</span>
+                      {item.hasSubmenu && (
+                        <ChevronDown 
+                          size={14} 
+                          className={`ml-1 ${ThemeConstants.transitions.default} ${
+                            item.submenuOpen ? 'rotate-180' : ''
+                          }`}
+                        />
+                      )}
+                    </button>
+
+                    {/* Dropdown for top-level menu items */}
+                    {item.hasSubmenu && item.submenuOpen && (
+                      <div className={`absolute left-0 mt-1 w-48 ${ThemeConstants.bgColors.sidebar} ${ThemeConstants.rounded.md} ${ThemeConstants.shadows.lg} z-50 py-1`}>
+                        {item.submenu.map(subItem => (
+                          <button
+                            key={subItem.id}
+                            onClick={() => navigate(subItem.path)}
+                            className={`flex items-center w-full px-4 py-2 text-left text-sm ${
+                              subItem.active ? 'bg-slate-700' : 'hover:bg-slate-700'
+                            }`}
+                          >
+                            <span className="mr-2">{subItem.icon}</span>
+                            <span>{subItem.label}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </nav>
+
+            {/* Mobile menu button */}
+            <button 
+              className="lg:hidden p-2 rounded-md text-slate-200 hover:bg-slate-700"
+              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+            >
+              <Menu size={20} />
+            </button>
+            
+            {/* User Section - Right Side */}
+            <div className="flex items-center space-x-2 sm:space-x-4">
+              {/* Layout Toggle - Desktop Only */}
+              {!isMobile && (
+                <button 
+                  onClick={toggleLayoutMode}
+                  className={`hidden sm:block p-2 ${ThemeConstants.rounded.full} hover:bg-slate-600 text-slate-200`}
+                  title="Cambiar a modo barra lateral"
+                >
+                  <ArrowLeftToLine size={20} />
+                </button>
+              )}
               
-              <button className={`p-2 ${ThemeConstants.rounded.full} hover:bg-slate-600 text-slate-200`}>
+              {/* Notifications - Hidden on mobile */}
+              <button className={`hidden sm:block p-2 ${ThemeConstants.rounded.full} hover:bg-slate-600 text-slate-200`}>
                 <Bell size={20} />
               </button>
               
+              {/* User Menu */}
               <div className="relative">
                 <button 
                   onClick={() => setUserMenuOpen(!userMenuOpen)} 
-                  className="flex items-center space-x-3 focus:outline-none text-slate-200"
+                  className="flex items-center space-x-1 sm:space-x-3 focus:outline-none text-slate-200"
                 >
-                  <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white">
-                    <User size={18} />
+                  <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-blue-600 flex items-center justify-center text-white">
+                    <User size={16} className="sm:w-4 sm:h-4" />
                   </div>
-                  <span className="font-medium hidden md:inline">{currentUser?.USUARIO || 'Usuario'}</span>
-                  <ChevronDown size={16} className="text-slate-300" />
+                  <span className="font-medium hidden sm:inline text-sm">{currentUser?.USUARIO || 'Usuario'}</span>
+                  <ChevronDown size={14} className="text-slate-300" />
                 </button>
                 
                 {userMenuOpen && (
                   <div className={`absolute right-0 mt-2 w-48 ${ThemeConstants.bgColors.card} ${ThemeConstants.rounded.md} ${ThemeConstants.shadows.lg} py-1 z-50 ${ThemeConstants.borders.card}`}>
-                    <button className={`block w-full text-left px-4 py-2 ${ThemeConstants.textColors.primary} hover:bg-slate-100`}>
+                    <button className={`block w-full text-left px-4 py-2 text-sm ${ThemeConstants.textColors.primary} hover:bg-slate-100`}>
                       Perfil
                     </button>
-                    <button className={`block w-full text-left px-4 py-2 ${ThemeConstants.textColors.primary} hover:bg-slate-100`}>
+                    <button className={`block w-full text-left px-4 py-2 text-sm ${ThemeConstants.textColors.primary} hover:bg-slate-100`}>
                       Configuración
                     </button>
                     <div className="border-t border-slate-200"></div>
                     <button 
                       onClick={handleLogout}
-                      className={`block w-full text-left px-4 py-2 ${ThemeConstants.textColors.primary} hover:bg-slate-100`}
+                      className={`block w-full text-left px-4 py-2 text-sm ${ThemeConstants.textColors.primary} hover:bg-slate-100`}
                     >
                       Cerrar Sesión
                     </button>
@@ -277,11 +313,77 @@ const MainLayout = ({ children }) => {
               </div>
             </div>
           </div>
+
+          {/* Mobile Navigation Menu */}
+          {isMobileMenuOpen && (
+            <div className={`lg:hidden ${ThemeConstants.bgColors.sidebar} border-t border-slate-600 py-2`}>
+              <nav className="px-4">
+                {navStructure.map(item => (
+                  <div key={item.id} className="mb-2">
+                    {item.hasSubmenu ? (
+                      <>
+                        <button
+                          onClick={item.onClick}
+                          className={`flex items-center justify-between w-full p-3 text-sm ${ThemeConstants.rounded.md} ${
+                            item.active ? 'bg-blue-700' : 'hover:bg-slate-700'
+                          }`}
+                        >
+                          <div className="flex items-center">
+                            <span className="mr-3">{item.icon}</span>
+                            <span>{item.label}</span>
+                          </div>
+                          <ChevronDown 
+                            size={16} 
+                            className={`${ThemeConstants.transitions.default} ${
+                              item.submenuOpen ? 'rotate-180' : ''
+                            }`}
+                          />
+                        </button>
+                        
+                        {item.submenuOpen && (
+                          <div className="pl-6 mt-1 space-y-1">
+                            {item.submenu.map(subItem => (
+                              <button
+                                key={subItem.id}
+                                onClick={() => {
+                                  navigate(subItem.path);
+                                  setIsMobileMenuOpen(false);
+                                }}
+                                className={`flex items-center w-full p-2 text-sm ${ThemeConstants.rounded.md} ${
+                                  subItem.active ? 'bg-slate-700' : 'hover:bg-slate-700'
+                                }`}
+                              >
+                                <span className="mr-3">{subItem.icon}</span>
+                                <span>{subItem.label}</span>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <button
+                        onClick={() => {
+                          navigate(item.path);
+                          setIsMobileMenuOpen(false);
+                        }}
+                        className={`flex items-center w-full p-3 text-sm ${ThemeConstants.rounded.md} ${
+                          item.active ? 'bg-blue-700' : 'hover:bg-slate-700'
+                        }`}
+                      >
+                        <span className="mr-3">{item.icon}</span>
+                        <span>{item.label}</span>
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </nav>
+            </div>
+          )}
         </header>
         
         {/* Page Content */}
-        <main className={`flex-1 overflow-hidden p-6 ${ThemeConstants.textColors.primary}`}
-              style={{ height: 'calc(100vh - 60px)' }}>
+        <main className={`flex-1 overflow-hidden p-2 sm:p-4 lg:p-6 ${ThemeConstants.textColors.primary}`}
+              style={{ height: isMobileMenuOpen ? 'calc(100vh - 240px)' : 'calc(100vh - 64px)' }}>
           {children}
         </main>
       </div>
@@ -290,10 +392,18 @@ const MainLayout = ({ children }) => {
 
   return (
     <div className={`flex h-screen ${ThemeConstants.bgColors.page}`}>
+      {/* Overlay para móvil cuando sidebar está abierto */}
+      {isMobile && sidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 z-30"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+      
       {/* Sidebar */}
       <div 
         className={`${ThemeConstants.bgColors.sidebar} ${ThemeConstants.textColors.sidebar} fixed h-full z-40 ${ThemeConstants.transitions.default} ${
-          sidebarOpen ? 'w-64' : 'w-20'
+          sidebarOpen ? (isMobile ? 'w-64' : 'w-64') : (isMobile ? '-translate-x-full w-64' : 'w-20')
         }`}
       >
         <div className="flex items-center justify-between p-3.5 bg-white border-b border-white-700">
