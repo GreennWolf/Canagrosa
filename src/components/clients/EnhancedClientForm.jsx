@@ -112,6 +112,9 @@ const ClientFormContent = memo(({
           ID_CLIENTE: null,
           NOMBRE: `${cloneData.NOMBRE} (duplicado)`,
           CIF: '', // Limpiar CIF (debe ser único)
+          // Limpiar otros campos que podrían requerir valores únicos
+          EMAIL: cloneData.EMAIL ? `${cloneData.EMAIL}` : '', // Mantener email para referencia pero podría requerir modificación
+          // Mantener todos los demás campos incluyendo direcciones, configuraciones, responsables, etc.
         };
         
         loadClientData(cloneClientData, cloneData.responsables || []);

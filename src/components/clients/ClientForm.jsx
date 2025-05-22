@@ -322,6 +322,11 @@ const ClientForm = ({
           ID_CLIENTE: null, // Remover ID para crear nuevo cliente
           NOMBRE: `${clientInfo.NOMBRE} (duplicado)`, // Modificar nombre
           CIF: '', // Limpiar CIF (debe ser único)
+          // Mantener email para referencia pero podría requerir modificación
+          EMAIL: clientInfo.EMAIL || '',
+          EMAIL2: clientInfo.EMAIL2 || '',
+          EMAIL_FACTURACION: clientInfo.EMAIL_FACTURACION || '',
+          // Mantener todas las direcciones y configuraciones
           PAIS_ID: clientInfo.PAIS_ID || '',
           PROVINCIA_ID: clientInfo.PROVINCIA_ID || '',
           MUNICIPIO_ID: clientInfo.MUNICIPIO_ID || '',
@@ -332,7 +337,25 @@ const ClientForm = ({
           PROVINCIA_ID_FACTURACION: clientInfo.PROVINCIA_ID_FACTURACION || '',
           MUNICIPIO_ID_FACTURACION: clientInfo.MUNICIPIO_ID_FACTURACION || '',
           FP_ID: clientInfo.FP_ID || '',
-          TARIFA_ID: clientInfo.TARIFA_ID || ''
+          TARIFA_ID: clientInfo.TARIFA_ID || '',
+          // Mantener configuraciones específicas del cliente
+          FACTURA_DETERMINACIONES: clientInfo.FACTURA_DETERMINACIONES || false,
+          EADS: clientInfo.EADS || false,
+          AIRBUS: clientInfo.AIRBUS || false,
+          IBERIA: clientInfo.IBERIA || false,
+          AGROALIMENTARIO: clientInfo.AGROALIMENTARIO || false,
+          INTRA: clientInfo.INTRA || false,
+          EXTRANJERO: clientInfo.EXTRANJERO || false,
+          FACTURA_ELECTRONICA: clientInfo.FACTURA_ELECTRONICA || false,
+          IDIOMA_FACTURA: clientInfo.IDIOMA_FACTURA || '',
+          // Mantener información financiera y bancaria
+          BANCO: clientInfo.BANCO || '',
+          CUENTA: clientInfo.CUENTA || '',
+          CENTRO: clientInfo.CENTRO || '',
+          CARGO: clientInfo.CARGO || '',
+          // Mantener observaciones y referencias
+          PARENT_ID: clientInfo.PARENT_ID || '',
+          OBSERVACIONES: clientInfo.OBSERVACIONES || ''
         }));
         
         // Si tiene responsables, cargarlos
