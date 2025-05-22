@@ -127,79 +127,94 @@ const useClientModal = (config = {}) => {
     });
   }, [openModal, closeModal, updateModalState, onClientUpdated]);
 
-  // Abrir modal de clonación de cliente
-  const openClientClone = useCallback(async (client) => {
+  // Clonar cliente directamente con confirmación
+  const openClientClone = useCallback((client) => {
     setSelectedClient(client);
-    updateModalState({ mode: 'clone', loading: true, error: null });
     
-    try {
-      // Obtener los datos completos del cliente antes de abrir el modal de clonación
-      const clienteCompleto = await clientesService.obtenerPorId(client.ID_CLIENTE);
-      
-      let clientData;
-      if (Array.isArray(clienteCompleto) && clienteCompleto.length > 0) {
-        clientData = clienteCompleto[0];
-      } else if (typeof clienteCompleto === 'object') {
-        clientData = clienteCompleto;
-      } else {
-        throw new Error('No se pudieron obtener los datos completos del cliente');
-      }
-      
-      updateModalState({ mode: 'clone', loading: false, error: null });
-      
-      openModal('clientClone', {
-        title: `Clonar Cliente: ${clientData.NOMBRE}`,
-        size: '2xl',
-        content: (
-          <EnhancedClientForm 
-            ref={formRef}
-            isClone={true}
-            cloneData={clientData}
-            onSuccess={(newClient) => {
-              closeModal('clientClone');
-              // Mostrar mensaje de éxito brevemente
+    openModal('clientCloneConfirm', {
+      title: 'Confirmar clonación',
+      size: 'sm',
+      content: (
+        <ConfirmDialog
+          title="¿Clonar cliente?"
+          message={`¿Estás seguro de que quieres clonar el cliente "${client.NOMBRE}"?`}
+          onConfirm={async () => {
+            closeModal('clientCloneConfirm');
+            updateModalState({ mode: 'clone', loading: true, error: null });
+            
+            try {
+              // Obtener datos completos y clonar directamente
+              const clienteCompleto = await clientesService.obtenerPorId(client.ID_CLIENTE);
+              
+              let clientData;
+              if (Array.isArray(clienteCompleto) && clienteCompleto.length > 0) {
+                clientData = clienteCompleto[0];
+              } else if (typeof clienteCompleto === 'object') {
+                clientData = clienteCompleto;
+              } else {
+                throw new Error('No se pudieron obtener los datos completos del cliente');
+              }
+              
+              // Preparar datos para clonación - copiar TODO excepto ID
+              const datosClonado = {
+                ...clientData, // Copiar TODO el objeto tal como viene de la base de datos
+                ID_CLIENTE: null, // Solo remover ID para que se genere uno nuevo
+                NOMBRE: `${clientData.NOMBRE} (duplicado)` // Solo modificar el nombre
+              };
+              
+              // Crear el cliente clonado directamente
+              const nuevoCliente = await clientesService.crear(datosClonado);
+              
+              updateModalState({ mode: 'clone', loading: false, error: null });
+              
+              // Mostrar mensaje de éxito
               openSuccessMessage('Cliente clonado correctamente');
+              
               // Notificar al padre
               if (onClientUpdated) {
-                onClientUpdated(newClient, 'clone');
+                onClientUpdated(nuevoCliente, 'clone');
               }
-            }}
-            onCancel={() => closeModal('clientClone')}
-          />
-        )
-      });
-    } catch (error) {
-      console.error('Error al obtener datos completos del cliente:', error);
-      updateModalState({ 
-        mode: 'clone', 
-        loading: false, 
-        error: error.message || 'Error al cargar los datos del cliente para clonación' 
-      });
-      
-      // Mostrar modal de error
-      openModal('errorModal', {
-        size: 'sm',
-        content: (
-          <>
-            <Modal.Header>Error</Modal.Header>
-            <Modal.Body>
-              <div className="flex items-start text-red-600">
-                <AlertCircle className="h-5 w-5 mr-2 flex-shrink-0" />
-                <p>{error.message || 'No se pudieron cargar los datos completos del cliente para clonación'}</p>
-              </div>
-            </Modal.Body>
-            <Modal.Footer>
-              <button
-                onClick={() => closeModal('errorModal')}
-                className="px-3 py-1.5 bg-blue-600 rounded text-white hover:bg-blue-700 text-sm"
-              >
-                Aceptar
-              </button>
-            </Modal.Footer>
-          </>
-        )
-      });
-    }
+              
+            } catch (error) {
+              console.error('Error al clonar cliente:', error);
+              updateModalState({ 
+                mode: 'clone', 
+                loading: false, 
+                error: error.message || 'Error al clonar el cliente' 
+              });
+              
+              // Mostrar modal de error
+              openModal('errorModal', {
+                size: 'sm',
+                content: (
+                  <>
+                    <Modal.Header>Error</Modal.Header>
+                    <Modal.Body>
+                      <div className="flex items-start text-red-600">
+                        <AlertCircle className="h-5 w-5 mr-2 flex-shrink-0" />
+                        <p>{error.message || 'No se pudo clonar el cliente. Por favor, intente nuevamente.'}</p>
+                      </div>
+                    </Modal.Body>
+                    <Modal.Footer>
+                      <button
+                        onClick={() => closeModal('errorModal')}
+                        className="px-3 py-1.5 bg-blue-600 rounded text-white hover:bg-blue-700 text-sm"
+                      >
+                        Aceptar
+                      </button>
+                    </Modal.Footer>
+                  </>
+                )
+              });
+            }
+          }}
+          onCancel={() => closeModal('clientCloneConfirm')}
+          confirmText="Sí, clonar"
+          cancelText="Cancelar"
+          type="info"
+        />
+      )
+    });
   }, [openModal, closeModal, updateModalState, onClientUpdated]);
   
   // Abrir modal de confirmación de eliminación
