@@ -8,13 +8,17 @@ import React, { useState } from 'react';
  * @param {Object} props.children - Componentes a renderizar en cada pestaña
  * @param {String} props.activeTab - ID de la pestaña activa
  * @param {Function} props.onTabChange - Función a llamar cuando cambia la pestaña
+ * @param {Boolean} props.fixedHeight - Si debe mantener altura fija entre tabs
+ * @param {String} props.contentHeight - Altura específica para el contenido
  */
 const TabPanel = ({ 
   tabs = [], 
   children, 
   activeTab: externalActiveTab = null,
   onTabChange = null,
-  className = ''
+  className = '',
+  fixedHeight = false,
+  contentHeight = '400px'
 }) => {
   // Estado interno para la pestaña activa si no se proporciona externamente
   const [internalActiveTab, setInternalActiveTab] = useState(tabs[0]?.id || '');
@@ -54,10 +58,19 @@ const TabPanel = ({
       </div>
       
       {/* Contenido de la pestaña activa */}
-      <div className="py-4">
-        {React.Children.toArray(children).find((child, index) => {
-          return tabs[index]?.id === activeTab;
-        })}
+      <div 
+        className="py-4"
+        style={fixedHeight ? {
+          minHeight: contentHeight,
+          height: contentHeight,
+          overflowY: 'auto'
+        } : {}}
+      >
+        <div className={fixedHeight ? 'h-full' : ''}>
+          {React.Children.toArray(children).find((child, index) => {
+            return tabs[index]?.id === activeTab;
+          })}
+        </div>
       </div>
     </div>
   );

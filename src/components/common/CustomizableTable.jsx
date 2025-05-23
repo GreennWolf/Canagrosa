@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import ThemeConstants from '../../constants/ThemeConstants';
 import useContainerDimensions from '../../hooks/useContainerDimensions';
+import useResponsiveTable from '../../hooks/useResponsiveTable';
 
 // Tooltip simplificado para contenido truncado
 const Tooltip = ({ content, children }) => {
@@ -56,6 +57,93 @@ const Tooltip = ({ content, children }) => {
         </div>
       )}
     </>
+  );
+};
+
+// Componente para vista de tarjetas en móvil
+const MobileCardView = ({ 
+  data, 
+  columns, 
+  selectedRow, 
+  onRowClick, 
+  onView, 
+  selectable,
+  emptyMessage 
+}) => {
+  if (data.length === 0) {
+    return (
+      <div className="p-6 text-center text-sm text-gray-500">
+        {emptyMessage}
+      </div>
+    );
+  }
+
+  // Encontrar campos principales para mostrar en las tarjetas
+  const primaryField = columns.find(col => col.primary)?.accessor || columns[0]?.accessor;
+  const secondaryField = columns.find(col => col.secondary)?.accessor || columns[1]?.accessor;
+  const fieldsToShow = columns.filter(col => !col.hideInCard);
+
+  return (
+    <div className="space-y-3 p-3">
+      {data.map((row, index) => (
+        <div
+          key={index}
+          onClick={() => selectable && onRowClick && onRowClick(row)}
+          className={`
+            bg-white border border-gray-200 rounded-lg p-4 shadow-sm
+            ${selectable ? 'cursor-pointer hover:shadow-md hover:border-blue-300' : ''}
+            ${selectable && selectedRow === row ? 'border-blue-500 bg-blue-50' : ''}
+          `}
+        >
+          {/* Encabezado de la tarjeta */}
+          <div className="flex justify-between items-start mb-3">
+            <div className="flex-1">
+              {primaryField && (
+                <h3 className="font-medium text-gray-900 text-sm mb-1">
+                  {row[primaryField]}
+                </h3>
+              )}
+              {secondaryField && secondaryField !== primaryField && (
+                <p className="text-gray-600 text-xs">
+                  {row[secondaryField]}
+                </p>
+              )}
+            </div>
+            {onView && (
+              <button
+                onClick={(e) => { e.stopPropagation(); onView(row); }}
+                className="p-2 text-blue-600 hover:text-blue-800 hover:bg-blue-100 rounded"
+              >
+                <Eye size={16} />
+              </button>
+            )}
+          </div>
+
+          {/* Detalles de la tarjeta */}
+          <div className="space-y-2">
+            {fieldsToShow.slice(0, 4).map((column) => {
+              if (column.accessor === primaryField || column.accessor === secondaryField) {
+                return null;
+              }
+              
+              const value = column.render ? column.render(row) : row[column.accessor];
+              if (!value) return null;
+              
+              return (
+                <div key={column.accessor} className="flex justify-between items-center">
+                  <span className="text-xs text-gray-500 font-medium">
+                    {column.header}:
+                  </span>
+                  <span className="text-xs text-gray-900 text-right flex-1 ml-2 truncate">
+                    {value}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ))}
+    </div>
   );
 };
 
@@ -306,11 +394,21 @@ const CustomizableTable = forwardRef(({
   hasMoreData = false,
   selectable = true,
   emptyMessage = "No hay datos disponibles",
-  infiniteScrollThreshold = 200, // Distancia en px desde el fondo para cargar más
-  minColumnWidth = 60, // Ancho mínimo para columnas en px
-  maxColumnWidth = 300, // Ancho máximo para columnas en px (reducido para evitar overflow)
+  infiniteScrollThreshold = 200,
+  minColumnWidth = 100,
+  maxColumnWidth = 400,
 }, ref) => {
-  // Hook para dimensiones de tabla (debe estar al inicio)
+  // Hook para sistema responsive
+  const {
+    responsiveColumns,
+    showMobileCards,
+    isMobile,
+    isTablet,
+    isDesktop,
+    getCellConfig
+  } = useResponsiveTable(columns, data);
+  
+  // Hook para dimensiones de tabla
   const { 
     containerRef: tableDimensionsRef, 
     availableWidth
@@ -607,11 +705,20 @@ const CustomizableTable = forwardRef(({
     );
   }
 
-  // Ordenar columnas visibles
-  const orderedVisibleColumns = columnOrder
-    .filter(accessor => visibleColumns.includes(accessor))
-    .map(accessor => columns.find(col => col.accessor === accessor))
-    .filter(Boolean);
+  // Usar columnas responsive o las visibles ordenadas
+  const orderedVisibleColumns = responsiveColumns.length > 0 ? 
+    columnOrder
+      .filter(accessor => {
+        const isVisible = visibleColumns.includes(accessor);
+        const isResponsive = responsiveColumns.some(col => col.accessor === accessor);
+        return isVisible && isResponsive;
+      })
+      .map(accessor => responsiveColumns.find(col => col.accessor === accessor))
+      .filter(Boolean) :
+    columnOrder
+      .filter(accessor => visibleColumns.includes(accessor))
+      .map(accessor => columns.find(col => col.accessor === accessor))
+      .filter(Boolean);
   
   // Combinar refs
   useEffect(() => {
@@ -625,33 +732,63 @@ const CustomizableTable = forwardRef(({
   const calculatedWidths = columnWidths;
   const maxTableWidth = availableWidth || window.innerWidth * 0.9;
 
-  // Ancho de columna flexible para columnas sin ancho específico
-  const flexColumnWidth = Math.max(
-    availableWidth && orderedVisibleColumns.length > 0 
-      ? availableWidth / orderedVisibleColumns.length 
-      : 120,
-    minColumnWidth
-  );
+  // Configuración de celdas responsive
+  const cellConfig = getCellConfig();
+  
+  // Ancho de columna flexible adaptativo al dispositivo
+  const getFlexColumnWidth = () => {
+    if (isMobile && !showMobileCards) {
+      // En móvil con pocas columnas, usar todo el ancho disponible
+      return availableWidth && orderedVisibleColumns.length > 0
+        ? Math.max(availableWidth / orderedVisibleColumns.length, 120)
+        : 200;
+    } else if (isTablet) {
+      // En tablet, balance entre ancho y número de columnas
+      return availableWidth && orderedVisibleColumns.length > 0
+        ? Math.max(availableWidth / orderedVisibleColumns.length, 140)
+        : 160;
+    } else {
+      // En desktop, usar anchos más generosos
+      return availableWidth && orderedVisibleColumns.length > 0
+        ? Math.max(availableWidth / orderedVisibleColumns.length, minColumnWidth)
+        : 180;
+    }
+  };
+  
+  const flexColumnWidth = getFlexColumnWidth();
 
   return (
     <div className="flex flex-col h-full" ref={ref}>
-      {/* Tabla con scroll infinito */}
+      {/* Contenedor con scroll infinito */}
       <div 
         className="overflow-hidden flex-grow border border-gray-200 rounded-md bg-white" 
         style={{ maxHeight: 'calc(100vh - 220px)', minHeight: '400px' }}
         ref={tableContainerRef}
       >
         <div className="overflow-auto h-full w-full">
-        <table 
-          className="w-full text-xs"
-          id={`table-${tableId}`}
-          ref={tableRef}
-          style={{ 
-            tableLayout: 'fixed',
-            width: maxTableWidth ? `${Math.min(maxTableWidth, availableWidth)}px` : '100%',
-            maxWidth: availableWidth ? `${availableWidth}px` : '100%'
-          }}
-        >
+          {/* Vista móvil de tarjetas */}
+          {showMobileCards ? (
+            <MobileCardView
+              data={data}
+              columns={columns}
+              selectedRow={selectedRow}
+              onRowClick={handleRowClick}
+              onView={onView}
+              selectable={selectable}
+              emptyMessage={emptyMessage}
+            />
+          ) : (
+            /* Vista de tabla tradicional */
+            <table 
+              className="w-full text-xs"
+              id={`table-${tableId}`}
+              ref={tableRef}
+              style={{ 
+                tableLayout: 'fixed',
+                width: maxTableWidth ? `${Math.min(maxTableWidth, availableWidth)}px` : '100%',
+                maxWidth: availableWidth ? `${availableWidth}px` : '100%'
+              }}
+            >
           <thead className="bg-gray-50 sticky top-0 z-10">
             <tr 
               onContextMenu={handleHeaderRightClick}
@@ -662,7 +799,7 @@ const CustomizableTable = forwardRef(({
                 <th
                   key={column.accessor}
                   data-column={column.accessor}
-                  className={`relative px-2 py-1 text-left text-xs font-medium text-gray-700 uppercase tracking-wider border-b border-gray-200 cursor-grab hover:bg-gray-100 ${
+                  className={`relative ${cellConfig.headerPadding} text-left ${cellConfig.headerFontSize} font-medium text-gray-700 uppercase tracking-wider border-b border-gray-200 cursor-grab hover:bg-gray-100 ${
                     dragOverHeader === column.accessor ? 'bg-blue-50' : ''
                   } ${draggedHeader === column.accessor ? 'opacity-50' : ''}`}
                   style={{ 
@@ -682,13 +819,13 @@ const CustomizableTable = forwardRef(({
                   onDragEnd={handleHeaderDragEnd}
                 >
                   <div className="flex items-center">
-                    <GripHorizontal size={10} className="mr-1 text-gray-400 flex-shrink-0" />
+                    {!isMobile && <GripHorizontal size={10} className="mr-1 text-gray-400 flex-shrink-0" />}
                     <span className="truncate">{column.header}</span>
                   </div>
                 </th>
               ))}
               {onView && (
-                <th className="px-2 py-1 text-right text-xs font-medium text-gray-700 uppercase tracking-wider border-b border-gray-200 w-10">
+                <th className={`${cellConfig.headerPadding} text-right ${cellConfig.headerFontSize} font-medium text-gray-700 uppercase tracking-wider border-b border-gray-200 ${isMobile ? 'w-12' : 'w-16'}`}>
                   <span className="sr-only">Acciones</span>
                 </th>
               )}
@@ -709,7 +846,7 @@ const CustomizableTable = forwardRef(({
                   {orderedVisibleColumns.map((column) => (
                     <td 
                       key={`${rowIndex}-${column.accessor}`}
-                      className="px-2 py-1 text-xs text-gray-900"
+                      className={`${cellConfig.padding} ${cellConfig.fontSize} text-gray-900`}
                       style={{
                         width: calculatedWidths[column.accessor] 
                           ? `${calculatedWidths[column.accessor]}px`
@@ -730,12 +867,12 @@ const CustomizableTable = forwardRef(({
                     </td>
                   ))}
                   {onView && (
-                    <td className="px-1 py-1 text-xs text-gray-900 text-right">
+                    <td className={`${cellConfig.padding} ${cellConfig.fontSize} text-gray-900 text-right`}>
                       <button
                         onClick={(e) => { e.stopPropagation(); onView(row); }}
-                        className="p-1 text-blue-600 hover:text-blue-800"
+                        className={`${isMobile ? 'p-1' : 'p-2'} text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded`}
                       >
-                        <Eye size={14} />
+                        <Eye size={isMobile ? 14 : 16} />
                       </button>
                     </td>
                   )}
@@ -745,31 +882,32 @@ const CustomizableTable = forwardRef(({
               <tr>
                 <td 
                   colSpan={orderedVisibleColumns.length + (onView ? 1 : 0)} 
-                  className="px-2 py-6 text-center text-sm text-gray-500"
+                  className={`${cellConfig.padding} text-center ${cellConfig.fontSize} text-gray-500`}
                 >
                   {emptyMessage}
                 </td>
               </tr>
             )}
           </tbody>
-        </table>
-        
-        {/* Indicador de carga para el scroll infinito */}
-        {(isLoadingMore || isInfiniteLoading) && data.length > 0 && (
-          <div className="flex justify-center items-center py-3 bg-white">
-            <div className="flex items-center bg-blue-50 px-3 py-1 rounded-full shadow-sm animate-pulse text-xs">
-              <Loader size={12} className="animate-spin mr-2 text-blue-500" />
-              <span className="text-blue-600">Cargando más datos...</span>
+            </table>
+          )}
+          
+          {/* Indicador de carga para el scroll infinito */}
+          {(isLoadingMore || isInfiniteLoading) && data.length > 0 && (
+            <div className="flex justify-center items-center py-3 bg-white">
+              <div className="flex items-center bg-blue-50 px-3 py-1 rounded-full shadow-sm animate-pulse text-xs">
+                <Loader size={12} className="animate-spin mr-2 text-blue-500" />
+                <span className="text-blue-600">Cargando más datos...</span>
+              </div>
             </div>
-          </div>
-        )}
-        
-        {/* Mensaje cuando no hay más datos para cargar */}
-        {!hasMoreData && data.length > 0 && (
-          <div className="text-center py-2 text-xs text-gray-500 bg-gray-50 border-t border-gray-200">
-            Has llegado al final de los resultados
-          </div>
-        )}
+          )}
+          
+          {/* Mensaje cuando no hay más datos para cargar */}
+          {!hasMoreData && data.length > 0 && (
+            <div className="text-center py-2 text-xs text-gray-500 bg-gray-50 border-t border-gray-200">
+              Has llegado al final de los resultados
+            </div>
+          )}
         </div>
       </div>
       

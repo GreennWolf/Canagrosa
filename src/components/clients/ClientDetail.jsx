@@ -432,7 +432,11 @@ const ClientDetail = ({ clientId, onEdit, onDelete, onClose }) => {
           />
         </div>
         
-        <TabPanel tabs={tabs}>
+        <TabPanel 
+          tabs={tabs}
+          fixedHeight={true}
+          contentHeight="450px"
+        >
           {/* Pestaña General */}
           <div className="space-y-4">
             <div className="flex flex-col md:flex-row gap-4">

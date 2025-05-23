@@ -15,6 +15,48 @@ const SIZES = {
   full: 'max-w-full mx-2 sm:mx-4'
 };
 
+// Alturas fijas para modales con tabs para evitar cambios de tamaño
+const FIXED_HEIGHTS = {
+  xs: '400px',
+  sm: '500px', 
+  md: '600px',
+  lg: '700px',
+  xl: '800px',
+  '2xl': '850px',
+  '3xl': '900px',
+  '4xl': '900px',
+  full: '95vh'
+};
+
+const MIN_HEIGHTS = {
+  xs: '350px',
+  sm: '450px',
+  md: '550px', 
+  lg: '650px',
+  xl: '750px',
+  '2xl': '800px',
+  '3xl': '850px',
+  '4xl': '850px',
+  full: '90vh'
+};
+
+// Función para obtener altura fija según el tamaño
+const getFixedHeight = (size) => {
+  // Solo aplicar altura fija en dispositivos desktop para evitar problemas en móvil
+  if (window.innerWidth < 768) {
+    return 'auto';
+  }
+  return FIXED_HEIGHTS[size] || FIXED_HEIGHTS.md;
+};
+
+// Función para obtener altura mínima según el tamaño
+const getMinHeight = (size) => {
+  if (window.innerWidth < 640) {
+    return '50vh';
+  }
+  return MIN_HEIGHTS[size] || MIN_HEIGHTS.md;
+};
+
 // Contexto interno para compartir onClose entre componentes
 const ModalContext = React.createContext(null);
 
@@ -29,7 +71,8 @@ const Modal = ({
   closeOnOverlayClick = true,
   preventCloseOnEsc = false,
   overlayClassName = '',
-  contentClassName = ''
+  contentClassName = '',
+  fixedHeight = false // Nueva prop para controlar altura fija
 }) => {
   const modalRef = useRef(null);
   const [isRendered, setIsRendered] = useState(false);
@@ -106,7 +149,8 @@ const Modal = ({
           role="dialog"
           style={{ 
             maxHeight: '95vh',
-            minHeight: window.innerWidth < 640 ? '50vh' : 'auto'
+            minHeight: fixedHeight ? getMinHeight(size) : (window.innerWidth < 640 ? '50vh' : 'auto'),
+            height: fixedHeight ? getFixedHeight(size) : 'auto'
           }}
         >
           {children}

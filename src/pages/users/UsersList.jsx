@@ -63,14 +63,17 @@ const UsersList = () => {
   const [isDeleting, setIsDeleting] = useState(false);
   
   // Función para cargar usuarios (primera página)
-  const fetchUsers = useCallback(async (forceRefresh = false) => {
+  const fetchUsers = useCallback(async (forceRefresh = false, customFilters = null) => {
     setIsLoading(true);
     setError(null);
     setPage(1); // Resetear a la primera página
     
     try {
+      // Usar filtros personalizados o los del estado actual
+      const filtersToUse = customFilters || filters;
+      
       // Filtrar parámetros vacíos
-      const activeFilters = Object.entries(filters).reduce((acc, [key, value]) => {
+      const activeFilters = Object.entries(filtersToUse).reduce((acc, [key, value]) => {
         if (value !== '') {
           acc[key] = value;
         }
@@ -96,7 +99,7 @@ const UsersList = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [filters]);
+  }, []); // Removemos filters de las dependencias
   
   // Función para cargar más usuarios (paginado)
   const loadMoreUsers = useCallback(async () => {
@@ -141,10 +144,19 @@ const UsersList = () => {
     });
   }, []);
   
-  // Cargar usuarios al montar el componente
+  // Cargar usuarios al montar el componente (solo una vez)
   useEffect(() => {
-    fetchUsers();
-  }, [fetchUsers]);
+    fetchUsers(false, filters);
+  }, []); // Sin dependencias para que solo se ejecute al montar
+  
+  // Efecto separado para manejar cambios en filtros
+  useEffect(() => {
+    // Solo ejecutar si los filtros tienen algún valor (no están todos vacíos)
+    const hasActiveFilters = Object.values(filters).some(value => value !== '');
+    if (hasActiveFilters) {
+      fetchUsers(false, filters);
+    }
+  }, [filters]); // Solo depende de filters
   
   // Búsqueda local para filtrar usuarios sin llamar a la API
   const handleLocalSearch = useCallback((searchText) => {
@@ -404,11 +416,16 @@ const UsersList = () => {
     {
       accessor: 'ID_EMPLEADO',
       header: 'ID',
-      width: 'w-16'
+      width: 'w-16',
+      priority: 3,
+      mobileShow: false
     },
     {
       accessor: 'NOMBRE',
       header: 'Nombre',
+      priority: 1,
+      mobileShow: true,
+      primary: true,
       render: (row) => (
         <div className="flex items-center">
           <UserCircle size={14} className="mr-1 text-gray-400" />
@@ -419,11 +436,16 @@ const UsersList = () => {
     {
       accessor: 'APELLIDOS',
       header: 'Apellidos',
+      priority: 2,
+      mobileShow: false,
       render: (row) => <span>{row.APELLIDOS || '-'}</span>
     },
     {
       accessor: 'USUARIO',
       header: 'Usuario',
+      priority: 1,
+      mobileShow: true,
+      secondary: true,
       render: (row) => (
         <div className="flex items-center">
           <User size={14} className="mr-1 text-gray-400" />
@@ -434,6 +456,8 @@ const UsersList = () => {
     {
       accessor: 'EMAIL',
       header: 'Email',
+      priority: 2,
+      mobileShow: false,
       render: (row) => (
         <div className="flex items-center">
           <Mail size={14} className="mr-1 text-gray-400" />
@@ -444,6 +468,9 @@ const UsersList = () => {
     {
       accessor: 'permission_summary',
       header: 'Permisos',
+      priority: 3,
+      mobileShow: false,
+      hideInCard: true,
       render: (row) => {
         const permissions = [];
         if (row.PER_IMPRESION === 1) permissions.push('Impresión');
@@ -475,6 +502,8 @@ const UsersList = () => {
     {
       accessor: 'role',
       header: 'Rol',
+      priority: 2,
+      mobileShow: false,
       render: (row) => {
         // Determinar el rol basado en los permisos
         let role = 'Usuario';
@@ -503,6 +532,8 @@ const UsersList = () => {
     {
       accessor: 'ANULADO',
       header: 'Estado',
+      priority: 2,
+      mobileShow: false,
       render: (row) => (
         row.ANULADO === 1 
           ? <div className="flex items-center text-red-600"><XCircle size={14} className="mr-1" />Anulado</div>
@@ -513,6 +544,9 @@ const UsersList = () => {
     {
       accessor: 'actions',
       header: 'Acciones',
+      priority: 1,
+      mobileShow: false,
+      hideInCard: true,
       render: (row) => (
         <div className="flex items-center space-x-1 justify-end">
           <button 

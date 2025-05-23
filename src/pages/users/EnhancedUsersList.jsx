@@ -266,7 +266,7 @@ const EnhancedUsersList = () => {
         debouncedFetch.cancel && debouncedFetch.cancel();
       };
     }
-  }, [filters, isInitialized, fetchUsers]);
+  }, [filters, isInitialized]); // Removemos fetchUsers de las dependencias
 
   // Función para manejar selección de usuario
   const handleUserSelect = useCallback((user) => {

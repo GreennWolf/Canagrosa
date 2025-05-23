@@ -359,7 +359,11 @@ const ClientFormContent = memo(({
             <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
           </div>
         ) : (
-          <TabPanel tabs={tabs}>
+          <TabPanel 
+            tabs={tabs}
+            fixedHeight={true}
+            contentHeight="500px"
+          >
             {/* Pestaña General */}
             <div className="space-y-4">
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">

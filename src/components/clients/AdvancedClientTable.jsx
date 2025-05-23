@@ -21,32 +21,32 @@ import { loadTableConfig, saveTableConfig, resetTableConfig } from '../../utils/
 import { useLayoutAwareTableWidth } from '../../hooks/useContainerDimensions';
 
 const DEFAULT_COLUMNS = [
-  // Basic Information (Visible by default)
-  { id: 'ID_CLIENTE', label: 'ID', width: 80, sortable: true, visible: true, type: 'number', icon: Hash },
-  { id: 'NOMBRE', label: 'Nombre', width: 200, sortable: true, visible: true, type: 'string', icon: Building },
-  { id: 'CIF', label: 'CIF/NIF', width: 120, sortable: true, visible: true, type: 'string', icon: Hash },
-  { id: 'TELEFONO', label: 'Teléfono', width: 120, sortable: true, visible: true, type: 'string', icon: Phone },
-  { id: 'EMAIL', label: 'Email', width: 180, sortable: true, visible: true, type: 'string', icon: AtSign },
-  { id: 'ANULADO', label: 'Estado', width: 100, sortable: true, visible: true, type: 'boolean', icon: CheckCircle },
+  // Basic Information (Visible by default) - Priority 1 (highest)
+  { id: 'ID_CLIENTE', label: 'ID', width: 80, sortable: true, visible: true, type: 'number', icon: Hash, priority: 2, mobileShow: false },
+  { id: 'NOMBRE', label: 'Nombre', width: 200, sortable: true, visible: true, type: 'string', icon: Building, priority: 1, mobileShow: true, primary: true },
+  { id: 'CIF', label: 'CIF/NIF', width: 120, sortable: true, visible: true, type: 'string', icon: Hash, priority: 2, mobileShow: false },
+  { id: 'TELEFONO', label: 'Teléfono', width: 120, sortable: true, visible: true, type: 'string', icon: Phone, priority: 1, mobileShow: true, secondary: true },
+  { id: 'EMAIL', label: 'Email', width: 180, sortable: true, visible: true, type: 'string', icon: AtSign, priority: 2, mobileShow: false },
+  { id: 'ANULADO', label: 'Estado', width: 100, sortable: true, visible: true, type: 'boolean', icon: CheckCircle, priority: 2, mobileShow: false },
   
-  // Address Information (Hidden by default)
-  { id: 'DIRECCION', label: 'Dirección', width: 200, sortable: true, visible: false, type: 'string', icon: MapPin },
-  { id: 'COD_POSTAL', label: 'CP', width: 80, sortable: true, visible: false, type: 'string', icon: MapPin },
-  { id: 'PAIS_ID', label: 'País', width: 100, sortable: true, visible: false, type: 'string', icon: MapPin },
-  { id: 'PROVINCIA_ID', label: 'Provincia', width: 120, sortable: true, visible: false, type: 'string', icon: MapPin },
-  { id: 'MUNICIPIO_ID', label: 'Municipio', width: 120, sortable: true, visible: false, type: 'string', icon: MapPin },
+  // Address Information (Hidden by default) - Priority 3 (low)
+  { id: 'DIRECCION', label: 'Dirección', width: 200, sortable: true, visible: false, type: 'string', icon: MapPin, priority: 3, mobileShow: false },
+  { id: 'COD_POSTAL', label: 'CP', width: 80, sortable: true, visible: false, type: 'string', icon: MapPin, priority: 3, mobileShow: false },
+  { id: 'PAIS_ID', label: 'País', width: 100, sortable: true, visible: false, type: 'string', icon: MapPin, priority: 3, mobileShow: false },
+  { id: 'PROVINCIA_ID', label: 'Provincia', width: 120, sortable: true, visible: false, type: 'string', icon: MapPin, priority: 3, mobileShow: false },
+  { id: 'MUNICIPIO_ID', label: 'Municipio', width: 120, sortable: true, visible: false, type: 'string', icon: MapPin, priority: 3, mobileShow: false },
   
-  // Contact Information (Hidden by default)
-  { id: 'RESPONSABLE', label: 'Responsable', width: 150, sortable: true, visible: false, type: 'string', icon: User },
-  { id: 'RESPONSABLE_OTROS', label: 'Otros Contacts', width: 150, sortable: true, visible: false, type: 'string', icon: User },
-  { id: 'RESPONSABLE_METROLOGIA', label: 'Resp. Metrología', width: 150, sortable: true, visible: false, type: 'string', icon: User },
-  { id: 'CARGO', label: 'Cargo', width: 120, sortable: true, visible: false, type: 'string', icon: User },
-  { id: 'FAX', label: 'Fax', width: 120, sortable: true, visible: false, type: 'string', icon: Phone },
-  { id: 'WEB', label: 'Web', width: 180, sortable: true, visible: false, type: 'string', icon: AtSign },
-  { id: 'EMAIL2', label: 'Email 2', width: 180, sortable: true, visible: false, type: 'string', icon: AtSign },
-  { id: 'EMAIL_FACTURACION', label: 'Email Facturación', width: 180, sortable: true, visible: false, type: 'string', icon: AtSign },
-  { id: 'EMAIL_METROLOGIA', label: 'Email Metrología', width: 180, sortable: true, visible: false, type: 'string', icon: AtSign },
-  { id: 'EMAIL_ALODINE', label: 'Email Alodine', width: 180, sortable: true, visible: false, type: 'string', icon: AtSign },
+  // Contact Information (Hidden by default) - Priority 2-3 (medium-low)
+  { id: 'RESPONSABLE', label: 'Responsable', width: 150, sortable: true, visible: false, type: 'string', icon: User, priority: 2, mobileShow: false },
+  { id: 'RESPONSABLE_OTROS', label: 'Otros Contacts', width: 150, sortable: true, visible: false, type: 'string', icon: User, priority: 3, mobileShow: false },
+  { id: 'RESPONSABLE_METROLOGIA', label: 'Resp. Metrología', width: 150, sortable: true, visible: false, type: 'string', icon: User, priority: 3, mobileShow: false },
+  { id: 'CARGO', label: 'Cargo', width: 120, sortable: true, visible: false, type: 'string', icon: User, priority: 3, mobileShow: false },
+  { id: 'FAX', label: 'Fax', width: 120, sortable: true, visible: false, type: 'string', icon: Phone, priority: 3, mobileShow: false },
+  { id: 'WEB', label: 'Web', width: 180, sortable: true, visible: false, type: 'string', icon: AtSign, priority: 3, mobileShow: false },
+  { id: 'EMAIL2', label: 'Email 2', width: 180, sortable: true, visible: false, type: 'string', icon: AtSign, priority: 3, mobileShow: false },
+  { id: 'EMAIL_FACTURACION', label: 'Email Facturación', width: 180, sortable: true, visible: false, type: 'string', icon: AtSign, priority: 3, mobileShow: false },
+  { id: 'EMAIL_METROLOGIA', label: 'Email Metrología', width: 180, sortable: true, visible: false, type: 'string', icon: AtSign, priority: 3, mobileShow: false },
+  { id: 'EMAIL_ALODINE', label: 'Email Alodine', width: 180, sortable: true, visible: false, type: 'string', icon: AtSign, priority: 3, mobileShow: false },
   
   // Business Information (Hidden by default)
   { id: 'TIPO', label: 'Tipo', width: 100, sortable: true, visible: false, type: 'string', icon: Building },

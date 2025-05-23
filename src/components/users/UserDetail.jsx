@@ -324,7 +324,11 @@ const UserDetail = forwardRef(({ user, onEdit, onDelete, onClone, onClose }, ref
           />
         </div>
         
-        <TabPanel tabs={tabs}>
+        <TabPanel 
+          tabs={tabs}
+          fixedHeight={true}
+          contentHeight="400px"
+        >
           {/* Pestaña Datos Personales */}
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-6">
